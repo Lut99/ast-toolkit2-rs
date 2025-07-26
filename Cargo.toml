@@ -1,0 +1,25 @@
+[package]
+name = "ast-toolkit2"
+version = "0.1.0"
+edition = "2024"
+authors = ["Lut99"]
+repository.workspace = true
+license.workspace = true
+description = "A (second) collection of libraries and macros for working with ASTs and compilers in Rust."
+
+
+[dependencies]
+
+
+[features]
+default = []
+
+
+[workspace]
+resolver = "3"
+members = ["./ast-toolkit2-build"]
+
+
+[workspace.package]
+repository = "https://github.com/Lut99/ast-toolkit2-rs"
+license = "Apache-2.0"

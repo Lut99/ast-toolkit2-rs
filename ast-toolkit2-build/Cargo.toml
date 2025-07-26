@@ -1,0 +1,15 @@
+[package]
+name = "ast-toolkit2-build"
+version = "0.1.0"
+edition = "2024"
+authors = ["Lut99"]
+repository.workspace = true
+license.workspace = true
+description = "Provides the build part of the ast-toolkit2"
+
+
+[dependencies]
+
+
+[features]
+default = []
