@@ -1,12 +1,24 @@
-//  NODE.rs
+//  MOD.rs
 //    by Lut99
 //
 //  Description:
-//!   Defines the core [`Node`]-trait and its two more specific counterparts,
-//!   [`Term`] and [`NonTerm`].
+//!   Defines the absolute core interfaces for the AST-toolkit.
+//!   
+//!   Essentially, this gives you the handles to talk about AST's generically:
+//!   - The [`Node`] defines any node in the tree, be it branches or leaves;
+//!   - The [`NonTerm`] defines branches in the tree, i.e., nodes made up of
+//!     other nodes. Very usually, these are extremely derivable; and
+//!   - The [`Term`] defines leaves in the tree, i.e., elementary concepts
+//!     (think literals or identifiers). Very usually, these require a bit more
+//!     detailled work.
 //
 
-use super::span::Spanning;
+use crate::loc::Located;
+
+/// Shorthand for including all the traits of this crate.
+pub mod prelude {
+    pub use super::*;
+}
 
 
 /***** INTERFACE *****/
@@ -25,7 +37,7 @@ use super::span::Spanning;
 ///   Terminals explicitly _don't_ have any children.
 ///
 /// Despite this difference, this trait represents the general part of the two.
-pub trait Node: Spanning {}
+pub trait Node: Located {}
 
 
 

@@ -6,10 +6,16 @@
 //
 
 // Declare the modules
-pub mod spec;
+#[cfg(feature = "loc")]
+pub mod loc;
+#[cfg(feature = "tree")]
+pub mod tree;
 
 /// Represents all the interfaces that are often used when working with the AST-toolkit and are
 /// thus useful to "import by default".
 pub mod prelude {
-    pub use super::spec::*;
+    #[cfg(feature = "loc")]
+    pub use super::loc::prelude::*;
+    #[cfg(feature = "tree")]
+    pub use super::tree::prelude::*;
 }

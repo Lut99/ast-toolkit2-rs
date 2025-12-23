@@ -9,10 +9,18 @@ description = "A (second) collection of libraries and macros for working with AS
 
 
 [dependencies]
+serde = { version = "1.0.0", features = ["derive"], optional = true }
 
 
 [features]
-default = []
+default = ["loc", "tree"]
+
+# Functionality
+loc = []
+tree = ["loc"]
+
+# Third-party
+serde = ["dep:serde"]
 
 
 [workspace]
