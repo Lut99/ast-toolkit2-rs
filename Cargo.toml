@@ -10,13 +10,18 @@ description = "A (second) collection of libraries and macros for working with AS
 
 [dependencies]
 serde = { version = "1.0.0", features = ["derive"], optional = true }
+thiserror = { version = "2.0.0", optional = true }
 
 
 [features]
 default = ["loc", "tree"]
 
+# Aliases
+parse = ["nibble"]
+
 # Functionality
 loc = []
+nibble = ["loc", "dep:thiserror"]
 tree = ["loc"]
 
 # Third-party
