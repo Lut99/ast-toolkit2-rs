@@ -20,6 +20,7 @@ default = ["loc", "tree"]
 parse = ["nibble"]
 
 # Functionality
+init = []
 loc = []
 nibble = ["loc", "dep:thiserror"]
 tree = ["loc"]
