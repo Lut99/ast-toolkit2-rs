@@ -11,6 +11,7 @@ use thiserror::Error;
 
 use super::{NibbleError, ParseStream};
 use crate::nibble::Parsable;
+use crate::prelude::ResultExt as _;
 
 
 /***** ERRORS *****/
@@ -21,6 +22,7 @@ pub struct Error<E> {
     /// The position of the element that failed.
     pub pos: usize,
     /// The error that caused it to fail.
+    #[source]
     pub err: E,
 }
 
@@ -39,7 +41,26 @@ impl<E, T: Parsable<E>> Parsable<E> for Vec<T> {
     }
 
     #[inline]
-    fn parse<'s, I: ParseStream<Elem<'s> = E>>(input: &'s mut I) -> Result<Self, NibbleError<Self::Error, I::Error>> {
-        /* TODO */
+    fn parse<'s, I: ParseStream<Elem<'s> = E>>(input: &'s I) -> Result<Option<Self>, NibbleError<Self::Error, I::Error>> {
+        // Read the input stream
+        // NOTE: I suspect it's quite optimal to avoid allocating until the first element. This
+        // because of the brute-force nature of the parser, and we'll probably see more failing
+        // calls then successful calls.
+        let mut res = Vec::new();
+        while let Some(item) = input.parse::<T>().map_syntax(|err| Error { pos: res.len(), err })? {
+            // Do some optimized scaling if necessary
+            if res.is_empty() {
+                res.reserve(4);
+            } else if res.len() >= res.capacity() {
+                res.reserve(res.len());
+            }
+
+            // Then push the item
+            res.push(item);
+        }
+
+        // Shrink to something efficient
+        res.shrink_to_fit();
+        Ok(Some(res))
     }
 }

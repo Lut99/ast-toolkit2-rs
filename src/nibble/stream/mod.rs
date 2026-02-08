@@ -9,6 +9,7 @@
 //
 
 // Define some provided impls
+pub mod copied;
 pub mod slice;
 
 use std::error::Error;
@@ -40,9 +41,7 @@ use crate::loc::Loc;
 pub trait ParseStream: Clone {
     /// The type of element that is yielded by the stream. Note that it may refer to the original
     /// input!
-    type Elem<'s>
-    where
-        Self: 's;
+    type Elem;
     /// The type of error that can occur if [`ParseStream::next()`] fails.
     type Error: 'static + Error;
 
@@ -56,6 +55,9 @@ pub trait ParseStream: Clone {
     /// negligible) penalty hit and clone the result. This is only yielded by reference as often,
     /// after parsing, some analysis has to be done to determine if what was parsed was useful.
     ///
+    /// Note that `self` isn't mutable. This because else the lifetime management is impossible
+    /// in parsing functions due to lifetimes become invariant or contravariant and such.
+    ///
     /// # Returns
     /// An instance of [`ParseStream::Elem`] representing the yielded element, together with a
     /// [`Loc`] describing where in the input it was found; or [`None`] if the stream ended.
@@ -64,7 +66,7 @@ pub trait ParseStream: Clone {
     /// This function may error if it failed to get the next item or information about whether it
     /// even exists. This can occur if the stream is backed by e.g. a file and the current position
     /// is not yet cached.
-    fn next<'s>(&'s mut self) -> Result<Option<(Self::Elem<'s>, Loc)>, Self::Error>;
+    fn next(self) -> Result<Option<(Self, Loc, Self::Elem)>, Self::Error>;
 
     /// Commits this current ParseStream's position as "the earliest you'll look."
     ///
@@ -74,7 +76,7 @@ pub trait ParseStream: Clone {
     /// For implementors: this means that, in the worst-case, **streams may still access elements
     /// before in the stream even after calling commit.** Well-behaved implementations are robust
     /// to this mistake, while well-behaved users avoid doing that.
-    fn commit(&mut self);
+    fn commit(self) -> Self;
 
 
     // Derived
@@ -89,5 +91,5 @@ pub trait ParseStream: Clone {
     /// # Errors
     /// This function can error if we failed to parse `P`, for whatever reason it thinks.
     #[inline]
-    fn parse<'s, P: Parsable<Self::Elem<'s>>>(&'s mut self) -> Result<P, NibbleError<P::Error, Self::Error>> { P::parse(self) }
+    fn parse<'s, P: Parsable<Self::Elem>>(self) -> Result<Option<(Self, P)>, NibbleError<P::Error, Self::Error>> { P::parse(self) }
 }

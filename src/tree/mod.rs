@@ -13,7 +13,7 @@
 //!     detailled work.
 //
 
-use crate::loc::Located;
+use crate::loc::{Loc, Located};
 
 /// Shorthand for including all the traits of this crate.
 pub mod prelude {
@@ -57,3 +57,35 @@ pub trait NonTerm: Node {}
 /// syntax, and parsing them requires worrying about encodings, whitespaces, etc. You can think of
 /// them forming a stream of the input, and [`NonTerm`]inals an understanding of that stream.
 pub trait Term: Node {}
+
+
+
+/// A more specific version of a [`Term`] that is a single UTF-8 keyword or punctuation.
+///
+/// Implementing this on your type will automatically implement [`Term`] and other things like
+/// [parser](crate::nibble::Parsable)s and such.
+pub trait Utf8Tag: Sized + Term {
+    /// The literal that we parse to find this keyword.
+    const TAG: &'static str;
+
+    /// Constructor for the Tag.
+    ///
+    /// The default implementation simply refers to [`Utf8Tag::with_loc()`] with a [`Loc::new()`].
+    ///
+    /// # Returns
+    /// A new instance of Self that is not tied to any Loc.
+    #[inline]
+    fn new() -> Self { Self::with_loc(Loc::new()) }
+
+    /// Constructor for the Tag from a (parsed) [`Loc`].
+    ///
+    /// # Arguments
+    /// - `loc`: A [`Loc`] describing where we parsed it from.
+    ///
+    /// # Returns
+    /// A new instance of Self that is parsed from `loc`.
+    fn with_loc(loc: Loc) -> Self;
+}
+
+// Blanket implementation for `Term` on anything `Utf8Tag`.
+impl<T: Utf8Tag> Term for T {}

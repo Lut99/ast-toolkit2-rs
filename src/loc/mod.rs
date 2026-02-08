@@ -41,6 +41,7 @@
 // Modules
 mod range;
 mod spec;
+pub mod test;
 
 // Imports
 use std::cmp::Ordering;

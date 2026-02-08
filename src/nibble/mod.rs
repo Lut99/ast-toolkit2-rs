@@ -17,6 +17,8 @@
 
 pub mod fmt;
 pub mod stream;
+#[cfg(feature = "tree")]
+mod utf8_tag;
 mod vec;
 
 use std::error::Error;
@@ -28,6 +30,47 @@ use thiserror::Error;
 /// Shorthand for including all the traits of this crate.
 pub mod prelude {
     pub use super::{Parsable, ParseStream};
+    use crate::nibble::NibbleError;
+
+
+    /// Trait for conveniently calling [`NibbleError::map_syntax()`] and
+    /// [`NibbleError::map_stream()`] through a [`Result`].
+    pub trait ResultExt<T, E1, E2> {
+        /// Allows one to call [`NibbleError::map_syntax()`] through a [`Result`].
+        ///
+        /// # Arguments
+        /// - `map`: Some [`FnOnce`] doing the mapping.
+        ///
+        /// # Returns
+        /// An equivalent error but with a mapped `E1`.
+        fn map_syntax<E>(self, map: impl FnOnce(E1) -> E) -> Result<T, NibbleError<E, E2>>;
+
+        /// Allows one to call [`NibbleError::map_stream()`] through a [`Result`].
+        ///
+        /// # Arguments
+        /// - `map`: Some [`FnOnce`] doing the mapping.
+        ///
+        /// # Returns
+        /// An equivalent error but with a mapped `E2`.
+        fn map_stream<E>(self, map: impl FnOnce(E2) -> E) -> Result<T, NibbleError<E1, E>>;
+    }
+    impl<T, E1, E2> ResultExt<T, E1, E2> for Result<T, NibbleError<E1, E2>> {
+        #[inline]
+        fn map_syntax<E>(self, map: impl FnOnce(E1) -> E) -> Result<T, NibbleError<E, E2>> {
+            match self {
+                Ok(res) => Ok(res),
+                Err(err) => Err(err.map_syntax(map)),
+            }
+        }
+
+        #[inline]
+        fn map_stream<E>(self, map: impl FnOnce(E2) -> E) -> Result<T, NibbleError<E1, E>> {
+            match self {
+                Ok(res) => Ok(res),
+                Err(err) => Err(err.map_stream(map)),
+            }
+        }
+    }
 }
 
 
@@ -45,6 +88,48 @@ pub enum NibbleError<E1, E2> {
     Syntax(#[source] E1),
     #[error("Failed to read the next token in the input stream")]
     Stream(#[source] E2),
+}
+impl<E1, E2> NibbleError<E1, E2> {
+    /// Map the [`Syntax`](NibbleError::Syntax) in this NibbleError.
+    ///
+    /// # Arguments
+    /// - `map`: Some [`FnOnce`] doing the mapping.
+    ///
+    /// # Returns
+    /// An equivalent error but with a mapped `E1`.
+    #[inline]
+    pub fn map_syntax<E>(self, map: impl FnOnce(E1) -> E) -> NibbleError<E, E2> {
+        match self {
+            Self::Syntax(err) => NibbleError::Syntax(map(err)),
+            Self::Stream(err) => NibbleError::Stream(err),
+        }
+    }
+
+    /// Map the [`Stream`](NibbleError::Stream) in this NibbleError.
+    ///
+    /// # Arguments
+    /// - `map`: Some [`FnOnce`] doing the mapping.
+    ///
+    /// # Returns
+    /// An equivalent error but with a mapped `E2`.
+    #[inline]
+    pub fn map_stream<E>(self, map: impl FnOnce(E2) -> E) -> NibbleError<E1, E> {
+        match self {
+            Self::Syntax(err) => NibbleError::Syntax(err),
+            Self::Stream(err) => NibbleError::Stream(map(err)),
+        }
+    }
+}
+impl<E1: Eq, E2: Eq> Eq for NibbleError<E1, E2> {}
+impl<E1: PartialEq, E2: PartialEq> PartialEq for NibbleError<E1, E2> {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Syntax(lhs), Self::Syntax(rhs)) => lhs == rhs,
+            (Self::Stream(lhs), Self::Stream(rhs)) => lhs == rhs,
+            _ => false,
+        }
+    }
 }
 
 
@@ -78,5 +163,5 @@ pub trait Parsable<E>: Sized {
     /// The actual parsing function.
     ///
     /// TODO.
-    fn parse<'s, I: ParseStream<Elem<'s> = E>>(input: &'s mut I) -> Result<Self, NibbleError<Self::Error, I::Error>>;
+    fn parse<'s, I: ParseStream<Elem<'s> = E>>(input: &'s I) -> Result<Option<Self>, NibbleError<Self::Error, I::Error>>;
 }

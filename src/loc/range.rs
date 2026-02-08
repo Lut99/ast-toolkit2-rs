@@ -6,6 +6,7 @@
 //
 
 use std::fmt::{Debug, Display, Formatter, Result as FResult};
+use std::hash::{Hash, Hasher};
 use std::ops;
 
 
@@ -42,7 +43,7 @@ pub const fn max(lhs: u64, rhs: u64) -> u64 { if lhs >= rhs { lhs } else { rhs }
 /// # A notice
 /// For your convenience, and, specifically, to support e.g.
 /// ```rust
-/// # use ast_toolkit_loc::Range;
+/// # use ast_toolkit2::loc::Range;
 /// Range::from(0..10);
 /// ```
 /// this is also implemented for _signed_ types. Obviously, these are _not_ guaranteed to be
@@ -308,6 +309,22 @@ impl Display for Range {
     fn fmt(&self, f: &mut Formatter<'_>) -> FResult { <Self as Debug>::fmt(self, f) }
 }
 impl Eq for Range {}
+impl Hash for Range {
+    #[inline]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        let Self { pos, len } = self;
+        pos.hash(state);
+        match len {
+            // If the length is fixed, then we compute the "end" and hash that; else, we don't hash
+            // anything (only some discriminant for the enum variant).
+            Length::Fixed(len) => {
+                0u8.hash(state);
+                pos.saturating_add(*len).hash(state)
+            },
+            Length::Indefinite => 1u8.hash(state),
+        }
+    }
+}
 impl PartialEq for Range {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
