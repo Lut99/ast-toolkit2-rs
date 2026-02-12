@@ -5,13 +5,12 @@
 //!   Implements [`Parsable`] for [`Vec`]s of [`Parsable`] things.
 //
 
-use std::fmt::{Formatter, Result as FResult};
+use std::fmt::{Display, Formatter, Result as FResult};
 
 use thiserror::Error;
 
-use super::{NibbleError, ParseStream};
-use crate::nibble::Parsable;
-use crate::prelude::ResultExt as _;
+use super::super::error::ResultExt;
+use super::super::{NibbleError, Parsable, Slice};
 
 
 /***** ERRORS *****/
@@ -30,24 +29,44 @@ pub struct Error<E> {
 
 
 
+/***** FORMATTERS *****/
+#[derive(Debug)]
+pub struct VecFormatter<F> {
+    /// The inner formatter
+    fmt: F,
+}
+impl<F: Display> Display for VecFormatter<F> {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter<'_>) -> FResult {
+        write!(f, "zero or more occurrences of ")?;
+        Display::fmt(&self.fmt, f)
+    }
+}
+impl<F> From<F> for VecFormatter<F> {
+    #[inline]
+    fn from(value: F) -> Self { Self { fmt: value } }
+}
+
+
+
+
+
 /***** IMPL *****/
 impl<E, T: Parsable<E>> Parsable<E> for Vec<T> {
+    type Formatter = VecFormatter<T::Formatter>;
     type Error = Error<T::Error>;
 
     #[inline]
-    fn expects_fmt(f: &mut Formatter<'_>) -> FResult {
-        write!(f, "zero or more occurrences of ")?;
-        T::expects_fmt(f)
-    }
+    fn expects() -> Self::Formatter { VecFormatter { fmt: T::expects() } }
 
     #[inline]
-    fn parse<'s, I: ParseStream<Elem<'s> = E>>(input: &'s I) -> Result<Option<Self>, NibbleError<Self::Error, I::Error>> {
+    fn parse(mut input: Slice<E>) -> Result<(Self, Slice<E>), NibbleError<Self::Formatter, Self::Error>> {
         // Read the input stream
         // NOTE: I suspect it's quite optimal to avoid allocating until the first element. This
         // because of the brute-force nature of the parser, and we'll probably see more failing
         // calls then successful calls.
         let mut res = Vec::new();
-        while let Some(item) = input.parse::<T>().map_syntax(|err| Error { pos: res.len(), err })? {
+        while let Some((item, rem)) = input.parse::<T>().transpose().map_nerr(|err| Error { pos: res.len(), err })? {
             // Do some optimized scaling if necessary
             if res.is_empty() {
                 res.reserve(4);
@@ -57,10 +76,11 @@ impl<E, T: Parsable<E>> Parsable<E> for Vec<T> {
 
             // Then push the item
             res.push(item);
+            input = rem;
         }
 
         // Shrink to something efficient
         res.shrink_to_fit();
-        Ok(Some(res))
+        Ok((res, input))
     }
 }
