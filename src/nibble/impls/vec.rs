@@ -7,26 +7,8 @@
 
 use std::fmt::{Display, Formatter, Result as FResult};
 
-use thiserror::Error;
-
 use super::super::error::ResultExt;
 use super::super::{NibbleError, Parsable, Slice};
-
-
-/***** ERRORS *****/
-/// Defines the error type yielded by parsing [`Vec`]s.
-#[derive(Debug, Error)]
-#[error("Failed to parse {pos}th element")]
-pub struct Error<E> {
-    /// The position of the element that failed.
-    pub pos: usize,
-    /// The error that caused it to fail.
-    #[source]
-    pub err: E,
-}
-
-
-
 
 
 /***** FORMATTERS *****/
@@ -54,7 +36,7 @@ impl<F> From<F> for VecFormatter<F> {
 /***** IMPL *****/
 impl<E, T: Parsable<E>> Parsable<E> for Vec<T> {
     type Formatter = VecFormatter<T::Formatter>;
-    type Error = Error<T::Error>;
+    type Error = T::Error;
 
     #[inline]
     fn expects() -> Self::Formatter { VecFormatter { fmt: T::expects() } }
@@ -66,7 +48,7 @@ impl<E, T: Parsable<E>> Parsable<E> for Vec<T> {
         // because of the brute-force nature of the parser, and we'll probably see more failing
         // calls then successful calls.
         let mut res = Vec::new();
-        while let Some((item, rem)) = input.parse::<T>().transpose().map_nerr(|err| Error { pos: res.len(), err })? {
+        while let Some((item, rem)) = input.parse::<T>().transpose().auto_map()? {
             // Do some optimized scaling if necessary
             if res.is_empty() {
                 res.reserve(4);
