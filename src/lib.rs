@@ -31,3 +31,9 @@ pub mod prelude {
     #[cfg(feature = "tree")]
     pub use super::tree::prelude::*;
 }
+
+/// Represents re-exports of macros.
+#[cfg(feature = "macros")]
+pub mod macros {
+    pub use ast_toolkit2_macros::Located;
+}

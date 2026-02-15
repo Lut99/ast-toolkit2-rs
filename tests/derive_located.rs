@@ -8,7 +8,7 @@
 
 use ast_toolkit2::loc::test::TestLoc;
 use ast_toolkit2::loc::{Loc, Located as _};
-use ast_toolkit2_macros::Located;
+use ast_toolkit2::macros::Located;
 
 
 /***** TESTS *****/
