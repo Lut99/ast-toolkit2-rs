@@ -1,0 +1,25 @@
+[package]
+name = "ast-toolkit2-macros"
+version = "0.1.0"
+edition = "2024"
+authors = ["Lut99"]
+repository.workspace = true
+license.workspace = true
+description = "Defines procedural macros for the ast-toolkit2 crate."
+
+
+[lib]
+proc-macro = true
+
+
+[dependencies]
+proc-macro2 = { version = "1.0.0", default-features = false, features = ["proc-macro"] }
+syn = { version = "2.0.0", default-features = false, features = ["derive", "parsing", "printing"] }
+quote = { version = "1.0.0", default-features = false }
+
+
+[features]
+default = []
+
+# Functionality
+loc = []

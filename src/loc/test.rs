@@ -11,7 +11,7 @@
 use std::hash::{Hash, Hasher};
 use std::ops::{Deref, DerefMut};
 
-use super::Loc;
+use super::{Loc, Located};
 
 
 /***** LIBRARY *****/
@@ -49,6 +49,12 @@ impl PartialEq for TestLoc {
         let Loc { source, range } = &self.0;
         source == &other.0.source && range == &other.0.range
     }
+}
+
+// Uniformity
+impl Located for TestLoc {
+    #[inline]
+    fn loc(&self) -> Loc { self.0 }
 }
 
 // Conversion

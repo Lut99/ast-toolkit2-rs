@@ -8,9 +8,17 @@ license.workspace = true
 description = "A (second) collection of libraries and macros for working with ASTs and compilers in Rust."
 
 
+[[test]]
+name = "derive_located"
+path = "./tests/derive_located.rs"
+required-features = ["loc", "macros"]
+
+
 [dependencies]
 serde = { version = "1.0.0", features = ["derive"], optional = true }
 thiserror = { version = "2.0.0", optional = true }
+
+ast-toolkit2-macros = { path = "./macros", optional = true }
 
 
 [features]
@@ -21,17 +29,18 @@ parse = ["nibble"]
 
 # Functionality
 init = []
-loc = []
+loc = ["ast-toolkit2-macros/loc"]
 nibble = ["loc", "dep:thiserror"]
 tree = ["loc"]
 
 # Third-party
+macros = ["dep:ast-toolkit2-macros"]
 serde = ["dep:serde"]
 
 
 [workspace]
 resolver = "3"
-members = ["./ast-toolkit2-build"]
+members = ["./ast-toolkit2-build", "./macros"]
 
 
 [workspace.package]

@@ -360,6 +360,12 @@ impl Loc {
     pub const fn end_in(&self, max_len: u64) -> u64 { self.range.end_in(max_len) }
 }
 
+// Uniformity
+impl Located for Loc {
+    #[inline(always)]
+    fn loc(&self) -> Loc { *self }
+}
+
 // Conversion
 impl From<Range> for Loc {
     #[inline]
