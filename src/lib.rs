@@ -38,5 +38,5 @@ pub mod macros {
     #[cfg(feature = "loc")]
     pub use ast_toolkit2_macros::Located;
     #[cfg(feature = "tree")]
-    pub use ast_toolkit2_macros::Node;
+    pub use ast_toolkit2_macros::{Node, NonTerm, Term};
 }

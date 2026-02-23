@@ -10,10 +10,9 @@ use quote::quote;
 use syn::parse::{Error, Parser as _};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned as _;
-use syn::{
-    Attribute, Data, DataEnum, DataStruct, DataUnion, DeriveInput, Fields, Generics, Ident, Meta, Path, PathArguments, PathSegment, Token,
-    TraitBound, TraitBoundModifier, TypeParamBound, Variant,
-};
+use syn::{Attribute, Data, DataEnum, DataStruct, DataUnion, DeriveInput, Fields, Generics, Ident, Meta, Token, Variant};
+
+use crate::common::inject_trait_bound;
 
 
 /***** HELPER FUNCTIONS *****/
@@ -162,30 +161,6 @@ fn find_loc_fields<'a>(attrs: impl IntoIterator<Item = &'a Attribute>, fields: &
     }
 }
 
-/// Given a set of [`Generics`], assigns each of them the `Located`-trait.
-///
-/// # Arguments
-/// - `gens`: The [`Generics`] to inject the additional trait bounds in.
-fn inject_located(gens: &mut Generics) {
-    for param in gens.type_params_mut() {
-        param.bounds.push(TypeParamBound::Trait(TraitBound {
-            paren_token: None,
-            modifier: TraitBoundModifier::None,
-            lifetimes: None,
-            path: Path {
-                leading_colon: Some(Default::default()),
-                segments:      {
-                    let mut segs = Punctuated::new();
-                    segs.push(PathSegment { ident: Ident::new("ast_toolkit2", Span::call_site()), arguments: PathArguments::None });
-                    segs.push(PathSegment { ident: Ident::new("loc", Span::call_site()), arguments: PathArguments::None });
-                    segs.push(PathSegment { ident: Ident::new("Located", Span::call_site()), arguments: PathArguments::None });
-                    segs
-                },
-            },
-        }))
-    }
-}
-
 
 
 
@@ -205,7 +180,7 @@ fn handle_struct(attrs: Vec<Attribute>, ident: Ident, mut generics: Generics, Da
     }
 
     // Injects the generics
-    inject_located(&mut generics);
+    inject_trait_bound(["ast_toolkit2", "loc", "Located"], &mut generics);
 
     // Use that to build an impl
     if loc_fields.len() == 1 {
@@ -315,7 +290,7 @@ fn handle_enum(attrs: Vec<Attribute>, ident: Ident, mut generics: Generics, data
             fn loc(&self) -> ::ast_toolkit2::loc::Loc { ::ast_toolkit2::loc::Loc::new() }
         } });
     }
-    inject_located(&mut generics);
+    inject_trait_bound(["ast_toolkit2", "loc", "Located"], &mut generics);
 
     // With that done, build the impl for each variant
     let mut inner: Vec<TokenStream2> = Vec::with_capacity(variants.len());

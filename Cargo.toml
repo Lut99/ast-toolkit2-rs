@@ -14,8 +14,8 @@ path = "./tests/derive_located.rs"
 required-features = ["loc", "macros"]
 
 [[test]]
-name = "derive_node"
-path = "./tests/derive_node.rs"
+name = "derive_tree"
+path = "./tests/derive_tree.rs"
 required-features = ["loc", "macros", "tree"]
 
 

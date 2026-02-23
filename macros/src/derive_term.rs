@@ -1,8 +1,8 @@
-//  DERIVE NODE.rs
+//  DERIVE TERM.rs
 //    by Lut99
 //
 //  Description:
-//!   Implements the derive macro for `Node`.
+//!   Implements the derive macro for `Term`.
 //
 
 use proc_macro2::TokenStream as TokenStream2;
@@ -21,9 +21,9 @@ pub fn handle(item: TokenStream2) -> Result<TokenStream2, Error> {
             inject_trait_bound(["ast_toolkit2", "tree", "Node"], &mut generics);
             let (impl_gen, ty_gen, where_clauses) = generics.split_for_impl();
             Ok(quote! {
-                impl #impl_gen ::ast_toolkit2::tree::Node for #ident #ty_gen #where_clauses {}
+                impl #impl_gen ::ast_toolkit2::tree::Term for #ident #ty_gen #where_clauses {}
             })
         },
-        Data::Union(DataUnion { union_token, .. }) => Err(Error::new(union_token.span, "Can only derive `Node` on structs or enums")),
+        Data::Union(DataUnion { union_token, .. }) => Err(Error::new(union_token.span, "Can only derive `Term` on structs or enums")),
     }
 }

@@ -6,10 +6,16 @@
 //
 
 // Modules
+#[cfg(any(feature = "loc", feature = "tree"))]
+mod common;
 #[cfg(feature = "loc")]
 mod derive_located;
 #[cfg(feature = "tree")]
 mod derive_node;
+#[cfg(feature = "tree")]
+mod derive_nonterm;
+#[cfg(feature = "tree")]
+mod derive_term;
 
 // Imports
 #[cfg(any(feature = "loc", feature = "tree"))]
@@ -161,7 +167,7 @@ pub fn derive_located(item: TokenStream) -> TokenStream {
 /// # Usage
 /// To use this macro, add it to your struct with the `derive`-attribute:
 /// ```ignore
-/// use ast_toolkit2::tree::{Node};
+/// use ast_toolkit2::tree::Node;
 ///
 /// #[derive(Node)]
 /// struct Foo;
@@ -170,10 +176,80 @@ pub fn derive_located(item: TokenStream) -> TokenStream {
 ///
 /// assert_node!(Foo);
 /// ```
+///
+/// ## A note on generics
+/// Like most derive macros, this macro will automatically add a `Node`-bound on all generic
+/// types declared on the implemented type.
+///
+/// If you need other generic behaviour, you should implement `Node` yourself.
 #[cfg(feature = "tree")]
 #[proc_macro_derive(Node)]
 pub fn derive_node(item: TokenStream) -> TokenStream {
     match derive_node::handle(item.into()) {
+        Ok(res) => res.into(),
+        Err(err) => err.into_compile_error().into(),
+    }
+}
+
+/// A procedural macro for automatically deriving the `NonTerm`-trait.
+///
+/// For now, the `NonTerm`-trait doesn't implement anything, so this macro just generates an empty
+/// implementation.
+///
+/// # Usage
+/// To use this macro, add it to your struct with the `derive`-attribute:
+/// ```ignore
+/// use ast_toolkit2::tree::NonTerm;
+///
+/// #[derive(NonTerm)]
+/// struct Foo;
+///
+/// fn assert_nonterm<T: NonTerm>(_t: T) {}
+///
+/// assert_nonterm!(Foo);
+/// ```
+///
+/// ## A note on generics
+/// Note that, instead of requiring `NonTerm` on all generics, this macro instead will require
+/// `Node` on all generics.
+///
+/// If you need other generic behaviour, you should implement `NonTerm` yourself.
+#[cfg(feature = "tree")]
+#[proc_macro_derive(NonTerm)]
+pub fn derive_nonterm(item: TokenStream) -> TokenStream {
+    match derive_nonterm::handle(item.into()) {
+        Ok(res) => res.into(),
+        Err(err) => err.into_compile_error().into(),
+    }
+}
+
+/// A procedural macro for automatically deriving the `Term`-trait.
+///
+/// For now, the `Term`-trait doesn't implement anything, so this macro just generates an empty
+/// implementation.
+///
+/// # Usage
+/// To use this macro, add it to your struct with the `derive`-attribute:
+/// ```ignore
+/// use ast_toolkit2::tree::Term;
+///
+/// #[derive(Term)]
+/// struct Foo;
+///
+/// fn assert_term<T: Term>(_t: T) {}
+///
+/// assert_term!(Foo);
+/// ```
+///
+/// ## A note on generics
+/// Note that, instead of requiring `Term` on all generics, this macro instead will require
+/// `Node` on all generics.
+///
+/// If you need other generic behaviour, you should implement `Term` yourself.
+#[cfg(feature = "tree")]
+#[proc_macro_derive(Term)]
+pub fn derive_term(item: TokenStream) -> TokenStream {
+    match derive_term::handle(item.into()) {
         Ok(res) => res.into(),
         Err(err) => err.into_compile_error().into(),
     }

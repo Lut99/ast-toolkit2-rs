@@ -15,7 +15,7 @@
 
 // Re-export some node macros
 #[cfg(feature = "macros")]
-pub use ast_toolkit2_macros::Node;
+pub use ast_toolkit2_macros::{Node, NonTerm, Term};
 
 use crate::loc::{Loc, Located};
 
