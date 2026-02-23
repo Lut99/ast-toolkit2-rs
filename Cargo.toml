@@ -13,6 +13,11 @@ name = "derive_located"
 path = "./tests/derive_located.rs"
 required-features = ["loc", "macros"]
 
+[[test]]
+name = "derive_node"
+path = "./tests/derive_node.rs"
+required-features = ["loc", "macros", "tree"]
+
 
 [dependencies]
 serde = { version = "1.0.0", features = ["derive"], optional = true }
@@ -31,7 +36,7 @@ parse = ["nibble"]
 init = []
 loc = ["ast-toolkit2-macros/loc"]
 nibble = ["loc", "dep:thiserror"]
-tree = ["loc"]
+tree = ["loc", "ast-toolkit2-macros/tree"]
 
 # Third-party
 macros = ["dep:ast-toolkit2-macros"]

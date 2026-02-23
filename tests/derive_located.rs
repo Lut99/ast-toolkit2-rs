@@ -7,8 +7,7 @@
 //
 
 use ast_toolkit2::loc::test::TestLoc;
-use ast_toolkit2::loc::{Loc, Located as _};
-use ast_toolkit2::macros::Located;
+use ast_toolkit2::loc::{Loc, Located};
 
 
 /***** TESTS *****/
@@ -71,6 +70,23 @@ fn test_derive_located_structs() {
         baz: TestLoc,
     }
 
+    /// New-style for structs.
+    #[derive(Located)]
+    #[loc(new)]
+    struct StructNew {
+        foo: TestLoc,
+        bar: TestLoc,
+    }
+
+    /// Structs but using generics.
+    #[derive(Located)]
+    struct StructGen<T> {
+        #[loc]
+        foo: T,
+        #[loc]
+        bar: TestLoc,
+    }
+
 
 
     /// Tuple-style, only field
@@ -93,6 +109,15 @@ fn test_derive_located_structs() {
     #[derive(Located)]
     #[loc(all)]
     struct TupleAll(TestLoc, TestLoc, TestLoc);
+
+    /// New-style for tuples.
+    #[derive(Located)]
+    #[loc(new)]
+    struct TupleNew(TestLoc, TestLoc);
+
+    /// Tuples but using generics.
+    #[derive(Located)]
+    struct TupleGen<T>(#[loc] T, #[loc] TestLoc);
 
 
 
@@ -132,26 +157,39 @@ fn test_derive_located_structs() {
         ),
         TestLoc(Loc::encapsulate_range(7, ..6))
     );
-    assert_eq!(TestLoc(TupleAuto(TestLoc(Loc::encapsulate(8))).loc()), TestLoc(Loc::encapsulate(8)));
-    assert_eq!(TestLoc(TupleManual("Hello, world!".into(), TestLoc(Loc::encapsulate(9))).loc()), TestLoc(Loc::encapsulate(9)));
+    assert_eq!(
+        TestLoc(StructNew { foo: TestLoc(Loc::encapsulate_range(8, ..2)), bar: TestLoc(Loc::encapsulate_range(8, 2..4)) }.loc()),
+        TestLoc(Loc::new())
+    );
+    assert_eq!(
+        TestLoc(StructGen { foo: TestLoc(Loc::encapsulate_range(9, 0..2)), bar: TestLoc(Loc::encapsulate_range(9, 2..4)) }.loc()),
+        TestLoc(Loc::encapsulate_range(9, 0..4))
+    );
+    assert_eq!(TestLoc(TupleAuto(TestLoc(Loc::encapsulate(10))).loc()), TestLoc(Loc::encapsulate(10)));
+    assert_eq!(TestLoc(TupleManual("Hello, world!".into(), TestLoc(Loc::encapsulate(11))).loc()), TestLoc(Loc::encapsulate(11)));
     assert_eq!(
         TestLoc(
             TupleMultiple(
-                TestLoc(Loc::encapsulate_range(10, 0..2)),
-                TestLoc(Loc::encapsulate_range(10, 2..4)),
-                TestLoc(Loc::encapsulate_range(10, 4..6))
+                TestLoc(Loc::encapsulate_range(12, 0..2)),
+                TestLoc(Loc::encapsulate_range(12, 2..4)),
+                TestLoc(Loc::encapsulate_range(12, 4..6))
             )
             .loc()
         ),
-        TestLoc(Loc::encapsulate_range(10, 0..4))
+        TestLoc(Loc::encapsulate_range(12, 0..4))
     );
-    assert_eq!(TestLoc(TupleNested(TupleAuto(TestLoc(Loc::encapsulate(11)))).loc()), TestLoc(Loc::encapsulate(11)));
+    assert_eq!(TestLoc(TupleNested(TupleAuto(TestLoc(Loc::encapsulate(13)))).loc()), TestLoc(Loc::encapsulate(13)));
     assert_eq!(
         TestLoc(
-            TupleAll(TestLoc(Loc::encapsulate_range(12, ..2)), TestLoc(Loc::encapsulate_range(12, 2..4)), TestLoc(Loc::encapsulate_range(12, 4..6)),)
+            TupleAll(TestLoc(Loc::encapsulate_range(14, ..2)), TestLoc(Loc::encapsulate_range(14, 2..4)), TestLoc(Loc::encapsulate_range(14, 4..6)),)
                 .loc()
         ),
-        TestLoc(Loc::encapsulate_range(12, ..6))
+        TestLoc(Loc::encapsulate_range(14, ..6))
+    );
+    assert_eq!(TestLoc(TupleNew(TestLoc(Loc::encapsulate_range(15, ..2)), TestLoc(Loc::encapsulate_range(15, 2..4))).loc()), TestLoc(Loc::new()));
+    assert_eq!(
+        TestLoc(TupleGen(TestLoc(Loc::encapsulate_range(16, 0..2)), TestLoc(Loc::encapsulate_range(16, 2..4))).loc()),
+        TestLoc(Loc::encapsulate_range(16, 0..4))
     );
 }
 
@@ -235,6 +273,25 @@ fn test_derive_located_enums() {
         Baz(TestLoc, #[loc] TestLoc),
     }
 
+    #[derive(Located)]
+    #[loc(new)]
+    enum EnumNew {
+        Foo { foo: TestLoc, bar: TestLoc },
+        Bar(TestLoc, TestLoc),
+    }
+
+    #[derive(Located)]
+    enum EnumNewVariant {
+        #[loc(new)]
+        Foo {
+            foo: TestLoc,
+            bar: TestLoc,
+        },
+        #[loc(new)]
+        Bar(TestLoc, TestLoc),
+        Baz(TestLoc, #[loc] TestLoc),
+    }
+
 
 
     assert_eq!(TestLoc(EnumAuto::Foo { loc: TestLoc(Loc::encapsulate(0)) }.loc()), TestLoc(Loc::encapsulate(0)));
@@ -310,5 +367,22 @@ fn test_derive_located_enums() {
     assert_eq!(
         TestLoc(EnumVariantAll::Baz(TestLoc(Loc::encapsulate_range(15, ..2)), TestLoc(Loc::encapsulate_range(15, 2..4)),).loc()),
         TestLoc(Loc::encapsulate_range(15, 2..4))
+    );
+    assert_eq!(
+        TestLoc(EnumNew::Foo { foo: TestLoc(Loc::encapsulate_range(16, ..2)), bar: TestLoc(Loc::encapsulate_range(16, 2..4)) }.loc()),
+        TestLoc(Loc::new())
+    );
+    assert_eq!(TestLoc(EnumNew::Bar(TestLoc(Loc::encapsulate_range(17, ..2)), TestLoc(Loc::encapsulate_range(17, 2..4))).loc()), TestLoc(Loc::new()));
+    assert_eq!(
+        TestLoc(EnumNewVariant::Foo { foo: TestLoc(Loc::encapsulate_range(18, ..2)), bar: TestLoc(Loc::encapsulate_range(18, 2..4)) }.loc()),
+        TestLoc(Loc::new())
+    );
+    assert_eq!(
+        TestLoc(EnumNewVariant::Bar(TestLoc(Loc::encapsulate_range(19, ..2)), TestLoc(Loc::encapsulate_range(19, 2..4))).loc()),
+        TestLoc(Loc::new())
+    );
+    assert_eq!(
+        TestLoc(EnumNewVariant::Baz(TestLoc(Loc::encapsulate_range(20, ..2)), TestLoc(Loc::encapsulate_range(20, 2..4))).loc()),
+        TestLoc(Loc::encapsulate_range(20, 2..4))
     );
 }

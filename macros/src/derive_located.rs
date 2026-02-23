@@ -10,7 +10,10 @@ use quote::quote;
 use syn::parse::{Error, Parser as _};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned as _;
-use syn::{Attribute, Data, DataEnum, DataStruct, DataUnion, DeriveInput, Fields, Ident, Meta, Token, Variant};
+use syn::{
+    Attribute, Data, DataEnum, DataStruct, DataUnion, DeriveInput, Fields, Generics, Ident, Meta, Path, PathArguments, PathSegment, Token,
+    TraitBound, TraitBoundModifier, TypeParamBound, Variant,
+};
 
 
 /***** HELPER FUNCTIONS *****/
@@ -40,8 +43,6 @@ fn has_loc_attr<'a>(attrs: impl IntoIterator<Item = &'a Attribute>) -> Result<bo
     Ok(false)
 }
 
-
-
 /// Given a set of [`Fields`], attempts to find the `loc`-field.
 ///
 /// It scans for either:
@@ -58,6 +59,8 @@ fn has_loc_attr<'a>(attrs: impl IntoIterator<Item = &'a Attribute>) -> Result<bo
 /// The list of found fields.
 fn find_loc_fields<'a>(attrs: impl IntoIterator<Item = &'a Attribute>, fields: &Fields) -> Result<Vec<usize>, Error> {
     // First, check if we have a toplevel attribute
+    let mut do_all: Option<Span> = None;
+    let mut do_new: Option<Span> = None;
     for attr in attrs {
         match &attr.meta {
             // We only filter on our own attributes
@@ -66,10 +69,8 @@ fn find_loc_fields<'a>(attrs: impl IntoIterator<Item = &'a Attribute>, fields: &
                 for meta in inner {
                     match meta {
                         // Now we control all attributes, so only do sensible ones
-                        Meta::Path(p) if p.is_ident("all") => {
-                            // It is set! We can immediately stop looking and return all fields
-                            return Ok((0..fields.len()).collect());
-                        },
+                        Meta::Path(p) if p.is_ident("all") => do_all = Some(p.span()),
+                        Meta::Path(p) if p.is_ident("new") => do_new = Some(p.span()),
                         meta => {
                             return Err(Error::new(
                                 meta.span(),
@@ -92,6 +93,15 @@ fn find_loc_fields<'a>(attrs: impl IntoIterator<Item = &'a Attribute>, fields: &
             // The rest we ignore, part of other crates (or macros)
             _ => continue,
         }
+    }
+
+    // Decide if we have global info
+    if do_all.is_some() && do_new.is_none() {
+        return Ok((0..fields.len()).collect());
+    } else if do_all.is_none() && do_new.is_some() {
+        return Ok(Vec::new());
+    } else if let (Some(_), Some(do_new)) = (do_all, do_new) {
+        return Err(Error::new(do_new, "Cannot declare both `#[loc(all)]` and `#[loc(new)]` on the same type or variant"));
     }
 
     // If we didn't find it, then try to find the fields.
@@ -152,16 +162,50 @@ fn find_loc_fields<'a>(attrs: impl IntoIterator<Item = &'a Attribute>, fields: &
     }
 }
 
+/// Given a set of [`Generics`], assigns each of them the `Located`-trait.
+///
+/// # Arguments
+/// - `gens`: The [`Generics`] to inject the additional trait bounds in.
+fn inject_located(gens: &mut Generics) {
+    for param in gens.type_params_mut() {
+        param.bounds.push(TypeParamBound::Trait(TraitBound {
+            paren_token: None,
+            modifier: TraitBoundModifier::None,
+            lifetimes: None,
+            path: Path {
+                leading_colon: Some(Default::default()),
+                segments:      {
+                    let mut segs = Punctuated::new();
+                    segs.push(PathSegment { ident: Ident::new("ast_toolkit2", Span::call_site()), arguments: PathArguments::None });
+                    segs.push(PathSegment { ident: Ident::new("loc", Span::call_site()), arguments: PathArguments::None });
+                    segs.push(PathSegment { ident: Ident::new("Located", Span::call_site()), arguments: PathArguments::None });
+                    segs
+                },
+            },
+        }))
+    }
+}
+
 
 
 
 
 /***** LIBRARY *****/
 /// Handler for structs.
-fn handle_struct(attrs: Vec<Attribute>, ident: Ident, DataStruct { fields, .. }: DataStruct) -> Result<TokenStream2, Error> {
+fn handle_struct(attrs: Vec<Attribute>, ident: Ident, mut generics: Generics, DataStruct { fields, .. }: DataStruct) -> Result<TokenStream2, Error> {
     // Search the fields for our darling fields
     let mut loc_fields = find_loc_fields(&attrs, &fields)?;
-    assert!(!loc_fields.is_empty());
+    if loc_fields.is_empty() {
+        // Special case: the user gave us `#[loc(new)]`
+        let (impl_gen, ty_gen, where_bounds) = generics.split_for_impl();
+        return Ok(quote! { impl #impl_gen ::ast_toolkit2::loc::Located for #ident #ty_gen #where_bounds {
+            #[inline(always)]
+            fn loc(&self) -> ::ast_toolkit2::loc::Loc { ::ast_toolkit2::loc::Loc::new() }
+        } });
+    }
+
+    // Injects the generics
+    inject_located(&mut generics);
 
     // Use that to build an impl
     if loc_fields.len() == 1 {
@@ -170,7 +214,8 @@ fn handle_struct(attrs: Vec<Attribute>, ident: Ident, DataStruct { fields, .. }:
             Some(name) => TokenTree2::Ident(name.clone()),
             None => TokenTree2::Literal(Literal2::usize_unsuffixed(field)),
         };
-        Ok(quote! { impl ::ast_toolkit2::loc::Located for #ident {
+        let (impl_gen, ty_gen, where_bounds) = generics.split_for_impl();
+        Ok(quote! { impl #impl_gen ::ast_toolkit2::loc::Located for #ident #ty_gen #where_bounds {
             #[inline]
             fn loc(&self) -> ::ast_toolkit2::loc::Loc {
                 ::ast_toolkit2::loc::Located::loc(&self.#name)
@@ -199,9 +244,10 @@ fn handle_struct(attrs: Vec<Attribute>, ident: Ident, DataStruct { fields, .. }:
         }
 
         // Now build the full impl
+        let (impl_gen, ty_gen, where_bounds) = generics.split_for_impl();
         let first: &TokenTree2 = names.first().unwrap();
         let rest: &[TokenTree2] = &names[1..];
-        Ok(quote! { impl ::ast_toolkit2::loc::Located for #ident {
+        Ok(quote! { impl #impl_gen ::ast_toolkit2::loc::Located for #ident #ty_gen #where_bounds {
             #[inline]
             fn loc(&self) -> ::ast_toolkit2::loc::Loc {
                 let mut res: ::ast_toolkit2::loc::Loc = ::ast_toolkit2::loc::Located::loc(&self.#first);
@@ -215,13 +261,17 @@ fn handle_struct(attrs: Vec<Attribute>, ident: Ident, DataStruct { fields, .. }:
 
 
 /// Handler for enums.
-fn handle_enum(attrs: Vec<Attribute>, ident: Ident, data: DataEnum) -> Result<TokenStream2, Error> {
+fn handle_enum(attrs: Vec<Attribute>, ident: Ident, mut generics: Generics, data: DataEnum) -> Result<TokenStream2, Error> {
     // For every variant...
     let mut variants: Vec<(Ident, bool, usize, Vec<(usize, Ident)>)> = Vec::with_capacity(data.variants.len());
     for Variant { attrs: vattrs, ident, fields, .. } in data.variants {
         // Search the fields for our darling fields
         let loc_fields = find_loc_fields(attrs.iter().chain(vattrs.iter()), &fields)?;
-        assert!(!loc_fields.is_empty());
+        if loc_fields.is_empty() {
+            // Special case: the user gave us `#[loc(new)]` on this type or variant
+            variants.push((ident, matches!(fields, Fields::Named(_)), fields.len(), Vec::new()));
+            continue;
+        }
 
         // Store the fields we have selected
         let is_named: bool = matches!(fields, Fields::Named(_));
@@ -249,16 +299,34 @@ fn handle_enum(attrs: Vec<Attribute>, ident: Ident, data: DataEnum) -> Result<To
 
     // Early-escape: if there are no variants, we don't generate the normal impl
     if variants.is_empty() {
-        return Ok(quote! { impl ::ast_toolkit2::loc::Located for #ident {
+        let (impl_gen, ty_gen, where_bounds) = generics.split_for_impl();
+        return Ok(quote! { impl #impl_gen ::ast_toolkit2::loc::Located for #ident #ty_gen #where_bounds {
             /// NOTE: Unreachable because there are no variants
             #[inline]
             fn loc(&self) -> ::ast_toolkit2::loc::Loc { ::std::unreachable!() }
         } });
     }
+    // Check if all fields are empty
+    if variants.iter().all(|(_, _, _, res)| res.is_empty()) {
+        // Special case: the user gave us `#[loc(new)]` on _all_ variants
+        let (impl_gen, ty_gen, where_bounds) = generics.split_for_impl();
+        return Ok(quote! { impl #impl_gen ::ast_toolkit2::loc::Located for #ident #ty_gen #where_bounds {
+            #[inline(always)]
+            fn loc(&self) -> ::ast_toolkit2::loc::Loc { ::ast_toolkit2::loc::Loc::new() }
+        } });
+    }
+    inject_located(&mut generics);
 
     // With that done, build the impl for each variant
     let mut inner: Vec<TokenStream2> = Vec::with_capacity(variants.len());
     for (variant, is_named, total_fields, fields) in variants {
+        // Special case: the user gave `#[loc(new)]` _only_ for this variant
+        if fields.is_empty() {
+            inner.push(quote! { Self::#variant { .. } => ::ast_toolkit2::loc::Loc::new(), });
+            continue;
+        }
+
+        // Else, we do the complex case
         if is_named {
             let nfields: Vec<&Ident> = fields.iter().map(|(_, n)| n).collect();
             let name: &Ident = nfields.first().unwrap();
@@ -287,7 +355,8 @@ fn handle_enum(attrs: Vec<Attribute>, ident: Ident, data: DataEnum) -> Result<To
     }
 
     // Now build the full impl
-    Ok(quote! { impl ::ast_toolkit2::loc::Located for #ident {
+    let (impl_gen, ty_gen, where_bounds) = generics.split_for_impl();
+    Ok(quote! { impl #impl_gen ::ast_toolkit2::loc::Located for #ident #ty_gen #where_bounds {
         #[inline]
         fn loc(&self) -> ::ast_toolkit2::loc::Loc {
             match self {
@@ -301,10 +370,10 @@ fn handle_enum(attrs: Vec<Attribute>, ident: Ident, data: DataEnum) -> Result<To
 
 /// Main handler for the macro.
 pub fn handle(item: TokenStream2) -> Result<TokenStream2, Error> {
-    let DeriveInput { attrs, ident, data, .. } = syn::parse2(item)?;
+    let DeriveInput { attrs, ident, generics, data, .. } = syn::parse2(item)?;
     match data {
-        Data::Struct(data_struct) => handle_struct(attrs, ident, data_struct),
-        Data::Enum(data_enum) => handle_enum(attrs, ident, data_enum),
+        Data::Struct(data_struct) => handle_struct(attrs, ident, generics, data_struct),
+        Data::Enum(data_enum) => handle_enum(attrs, ident, generics, data_enum),
         Data::Union(DataUnion { union_token, .. }) => Err(Error::new(union_token.span, "Can only derive `Located` on structs or enums")),
     }
 }

@@ -13,13 +13,14 @@ proc-macro = true
 
 
 [dependencies]
-proc-macro2 = { version = "1.0.0", default-features = false, features = ["proc-macro"] }
-syn = { version = "2.0.0", default-features = false, features = ["derive", "parsing", "printing"] }
-quote = { version = "1.0.0", default-features = false }
+proc-macro2 = { version = "1.0.0", default-features = false, features = ["proc-macro"], optional = true }
+syn = { version = "2.0.0", default-features = false, features = ["parsing"], optional = true }
+quote = { version = "1.0.0", default-features = false, optional = true }
 
 
 [features]
 default = []
 
 # Functionality
-loc = []
+loc = ["dep:proc-macro2", "dep:syn", "dep:quote", "syn/derive", "syn/printing"]
+tree = ["dep:proc-macro2", "dep:syn", "dep:quote"]

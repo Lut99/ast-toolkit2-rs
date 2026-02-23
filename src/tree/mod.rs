@@ -13,6 +13,10 @@
 //!     detailled work.
 //
 
+// Re-export some node macros
+#[cfg(feature = "macros")]
+pub use ast_toolkit2_macros::Node;
+
 use crate::loc::{Loc, Located};
 
 /// Shorthand for including all the traits of this crate.

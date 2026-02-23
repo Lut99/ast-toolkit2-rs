@@ -6,9 +6,13 @@
 //
 
 // Modules
+#[cfg(feature = "loc")]
 mod derive_located;
+#[cfg(feature = "tree")]
+mod derive_node;
 
 // Imports
+#[cfg(any(feature = "loc", feature = "tree"))]
 use proc_macro::TokenStream;
 
 
@@ -69,7 +73,7 @@ use proc_macro::TokenStream;
 /// assert_eq!(Bar { foo: Loc::encapsulate_range(0, ..2), bar: Loc::encapsulate_range(0, 2..4) }.loc(), Loc::encapsulate_range(0, ..4));
 /// ```
 ///
-/// Finally, if you want to use all fields anyway, you can also use:
+/// If you want to use all fields anyway, you can also use:
 /// ```ignore
 /// use ast_toolkit2::loc::{Loc, Located};
 ///
@@ -102,6 +106,20 @@ use proc_macro::TokenStream;
 /// assert_eq!(Qux::Quz(Loc::encapsulate_range(3, ..2), Loc::encapsulate_range(3, 2..4)).loc(), Loc::encapsulate_range(3, ..4));
 /// ```
 ///
+/// Finally, you can use `#loc(new)` to ignore all the fields and simply generate an empty, new
+/// `Loc` using `Loc::new()`:
+/// ```ignore
+/// use ast_toolkit2::loc::{Loc, Located};
+///
+/// #[derive(Located)]
+/// #[loc(new)]
+/// struct Quux {
+///     foo: String,
+/// }
+///
+/// assert_eq!(Quux { foo: "Hello, world!".into() }.loc(), Loc::new());
+/// ```
+///
 /// ## Deriving nested
 /// Note that the implementation actually makes use of the `Located::loc()`-implementation of your
 /// field. So, this is possible:
@@ -114,10 +132,48 @@ use proc_macro::TokenStream;
 /// struct Bar(Foo);
 ///
 /// assert_eq!(Bar(Foo(Loc::encapsulate(0))).loc(), Loc::encapsulate(0));
+///
+/// ## A note on generics
+/// Like most derive macros, this macro will automatically add a `Located`-bound on all generic
+/// types declared on the implemented type.
+///
+/// Note, however, that this is _not_ the case if you declare `#loc(new)` (in which case no field
+/// is used for the impl) or if you have an empty enum.
+///
+/// If you need other generic behaviour, you should implement `Located` yourself.
 /// ```
+#[cfg(feature = "loc")]
 #[proc_macro_derive(Located, attributes(loc))]
 pub fn derive_located(item: TokenStream) -> TokenStream {
     match derive_located::handle(item.into()) {
+        Ok(res) => res.into(),
+        Err(err) => err.into_compile_error().into(),
+    }
+}
+
+
+
+/// A procedural macro for automatically deriving the `Node`-trait.
+///
+/// For now, the `Node`-trait doesn't implement anything, so this macro just generates an empty
+/// implementation.
+///
+/// # Usage
+/// To use this macro, add it to your struct with the `derive`-attribute:
+/// ```ignore
+/// use ast_toolkit2::tree::{Node};
+///
+/// #[derive(Node)]
+/// struct Foo;
+///
+/// fn assert_node<T: Node>(_t: T) {}
+///
+/// assert_node!(Foo);
+/// ```
+#[cfg(feature = "tree")]
+#[proc_macro_derive(Node)]
+pub fn derive_node(item: TokenStream) -> TokenStream {
+    match derive_node::handle(item.into()) {
         Ok(res) => res.into(),
         Err(err) => err.into_compile_error().into(),
     }
