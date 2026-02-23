@@ -18,7 +18,7 @@ pub fn handle(item: TokenStream2) -> Result<TokenStream2, Error> {
     let DeriveInput { ident, data, mut generics, .. } = syn::parse2(item)?;
     match data {
         Data::Struct(_) | Data::Enum(_) => {
-            inject_trait_bound(["ast_toolkit2", "tree", "Node"], &mut generics);
+            inject_trait_bound(["ast_toolkit2", "loc", "Located"], &mut generics);
             let (impl_gen, ty_gen, where_clauses) = generics.split_for_impl();
             Ok(quote! {
                 impl #impl_gen ::ast_toolkit2::tree::Node for #ident #ty_gen #where_clauses {}

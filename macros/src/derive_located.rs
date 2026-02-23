@@ -56,7 +56,7 @@ fn has_loc_attr<'a>(attrs: impl IntoIterator<Item = &'a Attribute>) -> Result<bo
 ///
 /// # Returns
 /// The list of found fields.
-fn find_loc_fields<'a>(attrs: impl IntoIterator<Item = &'a Attribute>, fields: &Fields) -> Result<Vec<usize>, Error> {
+pub fn find_loc_fields<'a>(attrs: impl IntoIterator<Item = &'a Attribute>, fields: &Fields) -> Result<Vec<usize>, Error> {
     // First, check if we have a toplevel attribute
     let mut do_all: Option<Span> = None;
     let mut do_new: Option<Span> = None;

@@ -15,6 +15,8 @@ mod derive_node;
 #[cfg(feature = "tree")]
 mod derive_nonterm;
 #[cfg(feature = "tree")]
+mod derive_tag;
+#[cfg(feature = "tree")]
 mod derive_term;
 
 // Imports
@@ -178,8 +180,8 @@ pub fn derive_located(item: TokenStream) -> TokenStream {
 /// ```
 ///
 /// ## A note on generics
-/// Like most derive macros, this macro will automatically add a `Node`-bound on all generic
-/// types declared on the implemented type.
+/// Note that, instead of requiring `Node` on all generics, this macro instead will require
+/// `Located` on all generics.
 ///
 /// If you need other generic behaviour, you should implement `Node` yourself.
 #[cfg(feature = "tree")]
@@ -211,7 +213,7 @@ pub fn derive_node(item: TokenStream) -> TokenStream {
 ///
 /// ## A note on generics
 /// Note that, instead of requiring `NonTerm` on all generics, this macro instead will require
-/// `Node` on all generics.
+/// `Located` on all generics.
 ///
 /// If you need other generic behaviour, you should implement `NonTerm` yourself.
 #[cfg(feature = "tree")]
@@ -243,13 +245,32 @@ pub fn derive_nonterm(item: TokenStream) -> TokenStream {
 ///
 /// ## A note on generics
 /// Note that, instead of requiring `Term` on all generics, this macro instead will require
-/// `Node` on all generics.
+/// `Located` on all generics.
 ///
 /// If you need other generic behaviour, you should implement `Term` yourself.
 #[cfg(feature = "tree")]
 #[proc_macro_derive(Term)]
 pub fn derive_term(item: TokenStream) -> TokenStream {
     match derive_term::handle(item.into()) {
+        Ok(res) => res.into(),
+        Err(err) => err.into_compile_error().into(),
+    }
+}
+
+/// A procedural macro for automatically deriving the `Tag`-trait.
+///
+/// TODO
+///
+/// # Usage
+/// ## A note on generics
+/// Note that, instead of requiring `Tag` on all generics, this macro instead will require
+/// `Located` on all generics.
+///
+/// If you need other generic behaviour, you should implement `Term` yourself.
+#[cfg(feature = "tree")]
+#[proc_macro_derive(Tag)]
+pub fn derive_tag(item: TokenStream) -> TokenStream {
+    match derive_tag::handle(item.into()) {
         Ok(res) => res.into(),
         Err(err) => err.into_compile_error().into(),
     }
