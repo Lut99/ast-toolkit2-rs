@@ -8,5 +8,5 @@
 // The modules doing the implementations
 mod option;
 #[cfg(feature = "tree")]
-mod utf8_tag;
+mod tag;
 mod vec;

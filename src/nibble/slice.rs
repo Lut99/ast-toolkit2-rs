@@ -10,7 +10,7 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use std::ops::{Deref, RangeFrom};
 
 use super::{NibbleError, Parsable};
-use crate::loc::Loc;
+use crate::loc::{Loc, Located};
 
 
 /***** LIBRARY *****/
@@ -285,6 +285,12 @@ impl<'a, T> Slice<'a, T> {
     /// A tuple with the parsed element (if any) and then the remaining slice.
     #[inline]
     pub fn parse<T2: Parsable<T>>(self) -> Result<(T2, Self), NibbleError<T2::Formatter, T2::Error>> { T2::parse(self) }
+}
+
+// Loc
+impl<'a, T> Located for Slice<'a, T> {
+    #[inline]
+    fn loc(&self) -> Loc { Loc::encapsulate_range(self.id, self.offset..self.slice.len()) }
 }
 
 // Deref

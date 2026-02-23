@@ -64,13 +64,14 @@ pub trait Term: Node {}
 
 
 
-/// A more specific version of a [`Term`] that is a single UTF-8 keyword or punctuation.
+/// A more specific version of a [`Term`] that is a single sequence of parsable elements.
 ///
-/// Implementing this on your type will automatically implement [`Term`] and other things like
-/// [parser](crate::nibble::Parsable)s and such.
-pub trait Utf8Tag: Sized + Term {
+/// For example: this might be a keyword or specific punctuation.
+///
+/// Implementing this on your type will automatically some traits like parsers.
+pub trait Tag<E: 'static>: Sized + Term {
     /// The literal that we parse to find this keyword.
-    const TAG: &'static str;
+    const TAG: &'static [E];
 
     /// Constructor for the Tag.
     ///
@@ -90,6 +91,3 @@ pub trait Utf8Tag: Sized + Term {
     /// A new instance of Self that is parsed from `loc`.
     fn with_loc(loc: Loc) -> Self;
 }
-
-// Blanket implementation for `Term` on anything `Utf8Tag`.
-impl<T: Utf8Tag> Term for T {}

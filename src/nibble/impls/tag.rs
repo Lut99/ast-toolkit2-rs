@@ -6,21 +6,26 @@
 //
 
 use std::convert::Infallible;
-use std::fmt::{Display, Formatter, Result as FResult};
+use std::fmt::{Debug, Display, Formatter, Result as FResult};
 use std::marker::PhantomData;
 
 use super::super::error::Needed;
 use super::super::{NibbleError, Parsable, Slice};
-use crate::tree::Utf8Tag;
+use crate::tree::Tag;
 
 
 /***** FORMATTERS *****/
 #[derive(Debug, Eq, PartialEq)]
-pub struct Utf8TagFormatter<T> {
+pub struct TagFormatter<E, T> {
     /// The type to find.
-    _t: PhantomData<T>,
+    _t: PhantomData<(E, T)>,
 }
-impl<T: Utf8Tag> Display for Utf8TagFormatter<T> {
+impl<E, T> Display for TagFormatter<E, T>
+where
+    E: 'static,
+    T: Tag<E>,
+    &'static [E]: Debug,
+{
     #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> FResult { write!(f, "{:?}", T::TAG) }
 }
@@ -30,18 +35,23 @@ impl<T: Utf8Tag> Display for Utf8TagFormatter<T> {
 
 
 /***** IMPL *****/
-impl<T: Utf8Tag> Parsable<u8> for T {
-    type Formatter = Utf8TagFormatter<T>;
+impl<T, E> Parsable<E> for T
+where
+    T: Tag<E>,
+    E: 'static + PartialEq,
+    &'static [E]: Debug,
+{
+    type Formatter = TagFormatter<E, T>;
     type Error = Infallible;
 
     #[inline]
-    fn expects() -> Self::Formatter { Utf8TagFormatter { _t: PhantomData } }
+    fn expects() -> Self::Formatter { TagFormatter { _t: PhantomData } }
 
     #[inline]
-    fn parse(input: Slice<u8>) -> Result<(Self, Slice<u8>), NibbleError<Self::Formatter, Self::Error>> {
+    fn parse(input: Slice<E>) -> Result<(Self, Slice<E>), NibbleError<Self::Formatter, Self::Error>> {
         // Get a slice of bytes equal to (at most) the tag size
         let ((head, loc), rem) = input.head_slice_loc(Self::TAG.len());
-        for (&h, &t) in head.into_iter().zip(Self::TAG.as_bytes().into_iter()) {
+        for (h, t) in head.into_iter().zip(Self::TAG.into_iter()) {
             if h != t {
                 // Divirging bytes. More input can never fix this!
                 return Err(NibbleError::Unmatched(Self::expects(), None));
@@ -68,7 +78,7 @@ mod tests {
     use super::*;
     use crate::loc::test::TestLoc;
     use crate::loc::{Loc, Located};
-    use crate::tree::Node;
+    use crate::tree::{Node, Term};
 
     #[test]
     fn test_utf8_tag() {
@@ -80,8 +90,9 @@ mod tests {
             fn loc(&self) -> Loc { self.0.into() }
         }
         impl Node for Hello {}
-        impl Utf8Tag for Hello {
-            const TAG: &'static str = "Hello";
+        impl Term for Hello {}
+        impl Tag<u8> for Hello {
+            const TAG: &'static [u8] = b"Hello";
 
             #[inline]
             fn new() -> Self { Self(TestLoc::new()) }
@@ -102,8 +113,8 @@ mod tests {
         // Attempt to parse it
         assert_eq!(Hello::parse(input1), Ok((Hello(TestLoc(Loc::encapsulate_range(ID, ..5))), input1.slice(5..))));
         assert_eq!(Hello::parse(input2), Ok((Hello(TestLoc(Loc::encapsulate_range(ID, ..5))), input2.slice(5..))));
-        assert_eq!(Hello::parse(input3), Err(NibbleError::Unmatched(Utf8TagFormatter { _t: PhantomData }, Some(Needed::Bounded(1, 1)))));
-        assert_eq!(Hello::parse(input4), Err(NibbleError::Unmatched(Utf8TagFormatter { _t: PhantomData }, None)));
-        assert_eq!(Hello::parse(input5), Err(NibbleError::Unmatched(Utf8TagFormatter { _t: PhantomData }, Some(Needed::Bounded(5, 5)))));
+        assert_eq!(Hello::parse(input3), Err(NibbleError::Unmatched(TagFormatter { _t: PhantomData }, Some(Needed::Bounded(1, 1)))));
+        assert_eq!(Hello::parse(input4), Err(NibbleError::Unmatched(TagFormatter { _t: PhantomData }, None)));
+        assert_eq!(Hello::parse(input5), Err(NibbleError::Unmatched(TagFormatter { _t: PhantomData }, Some(Needed::Bounded(5, 5)))));
     }
 }
