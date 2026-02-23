@@ -369,6 +369,20 @@ impl Located for Loc {
 }
 
 // Conversion
+impl<A: Located> FromIterator<A> for Loc {
+    /// Iterates over this type to create one [`Loc`] [`Loc::extend()`]ed over all of the elements.
+    ///
+    /// If there are none, then [`Loc::new()`] is returned.
+    #[inline]
+    fn from_iter<T: IntoIterator<Item = A>>(iter: T) -> Self {
+        let mut res: Option<Loc> = None;
+        for elem in iter {
+            let loc = <A as Located>::loc(&elem);
+            res.get_or_insert(loc).extend(loc);
+        }
+        res.unwrap_or_else(Loc::new)
+    }
+}
 impl From<Range> for Loc {
     #[inline]
     fn from(value: Range) -> Self { Self { source: None, range: value } }
