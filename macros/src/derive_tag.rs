@@ -6,7 +6,7 @@
 //
 
 use proc_macro2::{Span, TokenStream as TokenStream2};
-use quote::quote;
+use quote::{quote, quote_spanned};
 use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned as _;
 use syn::{Attribute, Data, DataEnum, DataUnion, DeriveInput, Error, Expr, Meta, Token, Type};
@@ -79,14 +79,16 @@ pub fn handle(item: TokenStream2) -> Result<TokenStream2, Error> {
             let locs: Vec<usize> = crate::derive_located::find_loc_fields(&attrs, &s.fields)?;
             if locs.is_empty() {
                 // * Exactly? No!! The user can give us no loc for whatever reason. This means they just discard it.
+                // NOTE: We give this a span for better error handling
+                let def = quote_spanned! { ident.span() => ::std::default::Default::default() };
                 return Ok(quote! {
                     impl #impl_gen ::ast_toolkit2::tree::Tag<#elem> for #ident #ty_gen #where_clauses {
                         type TAG: &'static [#elem] = #tag;
 
                         #[inline]
-                        fn new() -> Self { Self { #field: ::std::convert::Into::into(::ast_toolkit2::loc::Loc::new()) } }
+                        fn new() -> Self { #def }
                         #[inline]
-                        fn with_loc(loc: ::ast_toolkit2::loc::Loc) -> Self { Self { #field: ::std::convert::Into::into(loc) } }
+                        fn with_loc(_: ::ast_toolkit2::loc::Loc) -> Self { #def }
                     }
                 });
             }
