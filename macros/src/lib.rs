@@ -259,16 +259,42 @@ pub fn derive_term(item: TokenStream) -> TokenStream {
 
 /// A procedural macro for automatically deriving the `Tag`-trait.
 ///
-/// TODO
+/// It will give it the TAG sequence of elements ELEM by giving the attribute:
+/// ```ignore
+/// #[tag(ELEM, TAG)]
+/// ```
+///
+/// In the implementation, `Tag::new()` will create an instance created through
+/// [`Default`](trait@Default). `Tag::with_loc()` will take that instance and then replace every
+/// field marked as `#[loc]` with the given one.
+///
+/// Note that the exact same `loc`-algorithm is used as for [`Located`]. See it for more
+/// information on how to mark fields as loc.
 ///
 /// # Usage
+/// ```ignore
+/// use ast_toolkit2::loc::Loc;
+/// use ast_toolkit2::tree::Tag;
+///
+/// #[derive(Tag)]
+/// #[tag(u8, b"foo")]
+/// struct Foo {
+///     loc: Loc,
+/// }
+///
+/// fn assert_tag<T: Tag>(_t: T) {}
+///
+/// assert_tag!(Foo);
+/// assert_eq!(Foo::TAG, b"foo");
+/// ```
+///
 /// ## A note on generics
 /// Note that, instead of requiring `Tag` on all generics, this macro instead will require
 /// `Located` on all generics.
 ///
-/// If you need other generic behaviour, you should implement `Term` yourself.
+/// If you need other generic behaviour, you should implement `Tag` yourself.
 #[cfg(feature = "tree")]
-#[proc_macro_derive(Tag, attributes(tag))]
+#[proc_macro_derive(Tag, attributes(loc, tag))]
 pub fn derive_tag(item: TokenStream) -> TokenStream {
     match derive_tag::handle(item.into()) {
         Ok(res) => res.into(),
