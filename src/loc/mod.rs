@@ -182,6 +182,54 @@ impl Ord for Loc {
     fn cmp(&self, _other: &Self) -> Ordering { Ordering::Equal }
 }
 
+// Serde
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for Loc {
+    /// WARNING: Note that this function deserializes the Loc from a `()`.
+    ///
+    /// Instead of reading something, it always returns [`Loc::new()`].
+    ///
+    /// _Note that this behaviour might change in the future. For now, this is here to make
+    /// deriving this on your types._
+    #[inline]
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct UnitVisitor;
+        impl<'de> serde::de::Visitor<'de> for UnitVisitor {
+            type Value = Loc;
+
+            #[inline]
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result { write!(f, "nothing") }
+
+            #[inline]
+            fn visit_unit<E>(self) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(Loc::new())
+            }
+        }
+
+        deserializer.deserialize_unit(UnitVisitor)
+    }
+}
+#[cfg(feature = "serde")]
+impl serde::Serialize for Loc {
+    /// WARNING: Note that this function serializes a `()` instead of a Loc.
+    ///
+    /// _Note that this behaviour might change in the future. For now, this is here to make
+    /// deriving this on your types._
+    #[inline]
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_unit()
+    }
+}
+
 // Range
 impl Loc {
     /// Returns a new Loc which is a subset of this one.

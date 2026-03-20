@@ -21,6 +21,7 @@ use super::{Loc, Located};
 /// operators that don't. This is mostly useful for checking if you parsed a Loc correctly, for
 /// example.
 #[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct TestLoc(pub Loc);
 
 // Constructors
