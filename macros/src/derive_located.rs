@@ -51,12 +51,13 @@ fn has_loc_attr<'a>(attrs: impl IntoIterator<Item = &'a Attribute>) -> Result<bo
 /// - If none of those are given but it's in tuple syntax, the only field.
 ///
 /// # Arguments
+/// - `trt`: The name of the trait for which we're finding locs. Only used for error messages.
 /// - `attrs`: A list of toplevel attributes to scan through.
 /// - `fields`: A [`Fields`] that represents the fields we scan through.
 ///
 /// # Returns
 /// The list of found fields.
-pub fn find_loc_fields<'a>(attrs: impl IntoIterator<Item = &'a Attribute>, fields: &Fields) -> Result<Vec<usize>, Error> {
+pub fn find_loc_fields<'a>(trt: &'static str, attrs: impl IntoIterator<Item = &'a Attribute>, fields: &Fields) -> Result<Vec<usize>, Error> {
     // First, check if we have a toplevel attribute
     let mut do_all: Option<Span> = None;
     let mut do_new: Option<Span> = None;
@@ -132,10 +133,13 @@ pub fn find_loc_fields<'a>(attrs: impl IntoIterator<Item = &'a Attribute>, field
                 // ...precisely one field called `loc`
                 Ok(vec![only_candidate])
             } else if !too_many_candidates.is_empty() {
-                Err(Error::new(fields.span(), "Failed to find any `#[loc]` field but found more than one `loc` fields; cannot derive `Located`"))
+                Err(Error::new(
+                    fields.span(),
+                    &format!("Failed to find any `#[loc]` field but found more than one `loc` fields; cannot derive `{trt}`"),
+                ))
             } else {
                 // ...or absolutely nothing
-                Err(Error::new(fields.span(), "Failed to find any `#[loc]` field or a field named `loc`; cannot derive `Located`"))
+                Err(Error::new(fields.span(), &format!("Failed to find any `#[loc]` field or a field named `loc`; cannot derive `{trt}`")))
             }
         },
 
@@ -154,10 +158,14 @@ pub fn find_loc_fields<'a>(attrs: impl IntoIterator<Item = &'a Attribute>, field
             }
 
             // We either have a list of marked fields; or nothing
-            if !res.is_empty() { Ok(res) } else { Err(Error::new(fields.span(), "Failed to find any `#[loc]` field; cannot derive `Located`")) }
+            if !res.is_empty() {
+                Ok(res)
+            } else {
+                Err(Error::new(fields.span(), &format!("Failed to find any `#[loc]` field; cannot derive `{trt}`")))
+            }
         },
 
-        Fields::Unit => Err(Error::new(fields.span(), "No fields present; cannot derive `Located`")),
+        Fields::Unit => Err(Error::new(fields.span(), &format!("No fields present; cannot derive `{trt}`"))),
     }
 }
 
@@ -169,7 +177,7 @@ pub fn find_loc_fields<'a>(attrs: impl IntoIterator<Item = &'a Attribute>, field
 /// Handler for structs.
 fn handle_struct(attrs: Vec<Attribute>, ident: Ident, mut generics: Generics, DataStruct { fields, .. }: DataStruct) -> Result<TokenStream2, Error> {
     // Search the fields for our darling fields
-    let mut loc_fields = find_loc_fields(&attrs, &fields)?;
+    let mut loc_fields = find_loc_fields("Located", &attrs, &fields)?;
     if loc_fields.is_empty() {
         // Special case: the user gave us `#[loc(new)]`
         let (impl_gen, ty_gen, where_bounds) = generics.split_for_impl();
@@ -241,7 +249,7 @@ fn handle_enum(attrs: Vec<Attribute>, ident: Ident, mut generics: Generics, data
     let mut variants: Vec<(Ident, bool, usize, Vec<(usize, Ident)>)> = Vec::with_capacity(data.variants.len());
     for Variant { attrs: vattrs, ident, fields, .. } in data.variants {
         // Search the fields for our darling fields
-        let loc_fields = find_loc_fields(attrs.iter().chain(vattrs.iter()), &fields)?;
+        let loc_fields = find_loc_fields("Located", attrs.iter().chain(vattrs.iter()), &fields)?;
         if loc_fields.is_empty() {
             // Special case: the user gave us `#[loc(new)]` on this type or variant
             variants.push((ident, matches!(fields, Fields::Named(_)), fields.len(), Vec::new()));

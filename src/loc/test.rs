@@ -24,6 +24,10 @@ use super::{Loc, Located};
 pub struct TestLoc(pub Loc);
 
 // Constructors
+impl Default for TestLoc {
+    #[inline]
+    fn default() -> Self { Self(Default::default()) }
+}
 impl TestLoc {
     /// Initializes a TestLoc around an empty [`Loc`].
     ///

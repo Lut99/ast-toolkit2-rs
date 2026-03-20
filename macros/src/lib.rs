@@ -268,7 +268,7 @@ pub fn derive_term(item: TokenStream) -> TokenStream {
 ///
 /// If you need other generic behaviour, you should implement `Term` yourself.
 #[cfg(feature = "tree")]
-#[proc_macro_derive(Tag)]
+#[proc_macro_derive(Tag, attributes(tag))]
 pub fn derive_tag(item: TokenStream) -> TokenStream {
     match derive_tag::handle(item.into()) {
         Ok(res) => res.into(),

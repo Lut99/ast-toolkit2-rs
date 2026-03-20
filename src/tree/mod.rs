@@ -18,7 +18,7 @@ mod tag;
 
 // Re-export some node macros
 #[cfg(feature = "macros")]
-pub use ast_toolkit2_macros::{Node, NonTerm, Term};
+pub use ast_toolkit2_macros::{Node, NonTerm, Tag, Term};
 pub use tag::Tag;
 
 use crate::loc::Located;

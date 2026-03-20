@@ -9,7 +9,7 @@ use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::{quote, quote_spanned};
 use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned as _;
-use syn::{Attribute, Data, DataEnum, DataUnion, DeriveInput, Error, Expr, Meta, Token, Type};
+use syn::{Attribute, Data, DataEnum, DataUnion, DeriveInput, Error, Expr, LitInt, Meta, Token, Type};
 
 use crate::common::inject_trait_bound;
 
@@ -74,71 +74,50 @@ pub fn handle(item: TokenStream2) -> Result<TokenStream2, Error> {
             inject_trait_bound(["ast_toolkit2", "loc", "Located"], &mut generics);
             let (impl_gen, ty_gen, where_clauses) = generics.split_for_impl();
 
-            // Find the fields that are loc'd
-            // This guarantees to us there is exactly one field*
-            let locs: Vec<usize> = crate::derive_located::find_loc_fields(&attrs, &s.fields)?;
-            if locs.is_empty() {
-                // * Exactly? No!! The user can give us no loc for whatever reason. This means they just discard it.
-                // NOTE: We give this a span for better error handling
-                let def = quote_spanned! { ident.span() => ::std::default::Default::default() };
-                return Ok(quote! {
-                    impl #impl_gen ::ast_toolkit2::tree::Tag<#elem> for #ident #ty_gen #where_clauses {
-                        type TAG: &'static [#elem] = #tag;
-
-                        #[inline]
-                        fn new() -> Self { #def }
-                        #[inline]
-                        fn with_loc(_: ::ast_toolkit2::loc::Loc) -> Self { #def }
-                    }
-                });
+            // Find the fields that are loc'd and compute a list of "index jumps"; i.e., the number
+            // of elements to skip until one arrives at the next index.
+            let mut locs: Vec<usize> = crate::derive_located::find_loc_fields("Tag", &attrs, &s.fields)?;
+            for i in 1..locs.len() {
+                locs[i] -= locs[i - 1];
             }
 
-            // First, figure out how to build a thing of this type
-            if s.fields.is_empty() {
-                return Err(Error::new(ident.span(), "Expected at least one field to put the tag's `Loc` in"));
-            } else if s.fields.len() == 1 {
-                // There is precisely one field; we assume that that's the one where we put the
-                // `loc`.
-                let field = s.fields.into_iter().next().unwrap();
-                if let Some(field) = field.ident {
-                    Ok(quote! {
-                        impl #impl_gen ::ast_toolkit2::tree::Tag<#elem> for #ident #ty_gen #where_clauses {
-                            type TAG: &'static [#elem] = #tag;
-
-                            #[inline]
-                            fn new() -> Self { Self { #field: ::std::convert::Into::into(::ast_toolkit2::loc::Loc::new()) } }
-                            #[inline]
-                            fn with_loc(loc: ::ast_toolkit2::loc::Loc) -> Self { Self { #field: ::std::convert::Into::into(loc) } }
-                        }
-                    })
-                } else {
-                    Ok(quote! {
-                        impl #impl_gen ::ast_toolkit2::tree::Tag<#elem> for #ident #ty_gen #where_clauses {
-                            type TAG: &'static [#elem] = #tag;
-
-                            #[inline]
-                            fn new() -> Self { Self(::std::convert::Into::into(::ast_toolkit2::loc::Loc::new())) }
-                            #[inline]
-                            fn with_loc(loc: ::ast_toolkit2::loc::Loc) -> Self { Self(::std::convert::Into::into(loc)) }
-                        }
-                    })
-                }
-            } else {
-                // More than one field; we'll have to use the normal field resolution rules
-                todo!();
-
-                // Now we can generate the impl
-                Ok(quote! {
-                    impl #impl_gen ::ast_toolkit2::tree::Tag<#elem> for #ident #ty_gen #where_clauses {
-                        type TAG: &'static [#elem] = #tag;
-
-                        #[inline]
-                        fn new() -> Self { TODO }
-                        #[inline]
-                        fn with_loc(loc: ::ast_toolkit2::loc::Loc) -> Self { TODO }
+            // Then generate an implementation overwriting each of those fields
+            let mut fields = s.fields.into_iter().enumerate();
+            let locs: Vec<TokenStream2> = locs
+                .into_iter()
+                .map(|di| {
+                    // SAFETY: We expect both all found loc fields indices to be in range, and our
+                    // difference algorithm above to work.
+                    let (i, field) = fields.nth(di.saturating_sub(1)).unwrap();
+                    if let Some(name) = field.ident {
+                        quote_spanned! { name.span() => res.#name = ::std::convert::Into::into(loc); }
+                    } else {
+                        // Avoid quote adding a `usize` suffix to the identifier by explicitly
+                        // turning it into a literal integer
+                        let i = LitInt::new(&i.to_string(), field.span());
+                        quote_spanned! { field.span() => res.#i = ::std::convert::Into::into(loc); }
                     }
                 })
-            }
+                .collect();
+
+            // Then build an impl that generates the default and replaces loc fields if they are
+            // there
+            let default_impl = quote_spanned! { ident.span() => ::std::default::Default::default() };
+            Ok(quote! {
+                impl #impl_gen ::ast_toolkit2::tree::Tag<#elem> for #ident #ty_gen #where_clauses {
+                    const TAG: &'static [#elem] = #tag;
+
+                    #[inline]
+                    fn new() -> Self { #default_impl }
+
+                    #[inline]
+                    fn with_loc(loc: ::ast_toolkit2::loc::Loc) -> Self {
+                        let mut res: Self = #default_impl;
+                        #(#locs)*
+                        res
+                    }
+                }
+            })
         },
 
         Data::Union(DataUnion { union_token, .. }) => Err(Error::new(union_token.span, "Can only derive `Tag` on structs")),
