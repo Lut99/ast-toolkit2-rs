@@ -12,6 +12,8 @@ pub mod init;
 pub mod loc;
 #[cfg(feature = "nibble")]
 pub mod nibble;
+#[cfg(feature = "punct")]
+pub mod punct;
 #[cfg(feature = "tree")]
 pub mod tree;
 
@@ -28,6 +30,8 @@ pub mod prelude {
     pub use super::loc::prelude::*;
     #[cfg(feature = "nibble")]
     pub use super::nibble::prelude::*;
+    #[cfg(feature = "punct")]
+    pub use super::punct::prelude::*;
     #[cfg(feature = "tree")]
     pub use super::tree::prelude::*;
 }
