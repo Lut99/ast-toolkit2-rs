@@ -69,6 +69,15 @@ fn test_derive_located_structs() {
         bar: TestLoc,
         baz: TestLoc,
     }
+    // All-style for structs with skip
+    #[derive(Located)]
+    #[loc(all)]
+    struct StructAllSkip {
+        foo: TestLoc,
+        #[loc(skip)]
+        bar: String,
+        baz: TestLoc,
+    }
 
     /// New-style for structs.
     #[derive(Located)]
@@ -109,6 +118,11 @@ fn test_derive_located_structs() {
     #[derive(Located)]
     #[loc(all)]
     struct TupleAll(TestLoc, TestLoc, TestLoc);
+
+    /// All-style for tuples with skip.
+    #[derive(Located)]
+    #[loc(all)]
+    struct TupleAllSkip(TestLoc, #[loc(skip)] String, TestLoc);
 
     /// New-style for tuples.
     #[derive(Located)]
@@ -158,38 +172,53 @@ fn test_derive_located_structs() {
         TestLoc(Loc::encapsulate_range(7, ..6))
     );
     assert_eq!(
-        TestLoc(StructNew { foo: TestLoc(Loc::encapsulate_range(8, ..2)), bar: TestLoc(Loc::encapsulate_range(8, 2..4)) }.loc()),
+        TestLoc(
+            StructAllSkip {
+                foo: TestLoc(Loc::encapsulate_range(8, ..2)),
+                bar: "Hello, world!".into(),
+                baz: TestLoc(Loc::encapsulate_range(8, 2..4)),
+            }
+            .loc()
+        ),
+        TestLoc(Loc::encapsulate_range(8, ..4))
+    );
+    assert_eq!(
+        TestLoc(StructNew { foo: TestLoc(Loc::encapsulate_range(9, ..2)), bar: TestLoc(Loc::encapsulate_range(9, 2..4)) }.loc()),
         TestLoc(Loc::new())
     );
     assert_eq!(
-        TestLoc(StructGen { foo: TestLoc(Loc::encapsulate_range(9, 0..2)), bar: TestLoc(Loc::encapsulate_range(9, 2..4)) }.loc()),
-        TestLoc(Loc::encapsulate_range(9, 0..4))
+        TestLoc(StructGen { foo: TestLoc(Loc::encapsulate_range(10, 0..2)), bar: TestLoc(Loc::encapsulate_range(10, 2..4)) }.loc()),
+        TestLoc(Loc::encapsulate_range(10, 0..4))
     );
-    assert_eq!(TestLoc(TupleAuto(TestLoc(Loc::encapsulate(10))).loc()), TestLoc(Loc::encapsulate(10)));
-    assert_eq!(TestLoc(TupleManual("Hello, world!".into(), TestLoc(Loc::encapsulate(11))).loc()), TestLoc(Loc::encapsulate(11)));
+    assert_eq!(TestLoc(TupleAuto(TestLoc(Loc::encapsulate(11))).loc()), TestLoc(Loc::encapsulate(11)));
+    assert_eq!(TestLoc(TupleManual("Hello, world!".into(), TestLoc(Loc::encapsulate(12))).loc()), TestLoc(Loc::encapsulate(12)));
     assert_eq!(
         TestLoc(
             TupleMultiple(
-                TestLoc(Loc::encapsulate_range(12, 0..2)),
-                TestLoc(Loc::encapsulate_range(12, 2..4)),
-                TestLoc(Loc::encapsulate_range(12, 4..6))
+                TestLoc(Loc::encapsulate_range(13, 0..2)),
+                TestLoc(Loc::encapsulate_range(13, 2..4)),
+                TestLoc(Loc::encapsulate_range(13, 4..6))
             )
             .loc()
         ),
-        TestLoc(Loc::encapsulate_range(12, 0..4))
+        TestLoc(Loc::encapsulate_range(13, 0..4))
     );
-    assert_eq!(TestLoc(TupleNested(TupleAuto(TestLoc(Loc::encapsulate(13)))).loc()), TestLoc(Loc::encapsulate(13)));
+    assert_eq!(TestLoc(TupleNested(TupleAuto(TestLoc(Loc::encapsulate(14)))).loc()), TestLoc(Loc::encapsulate(14)));
     assert_eq!(
         TestLoc(
-            TupleAll(TestLoc(Loc::encapsulate_range(14, ..2)), TestLoc(Loc::encapsulate_range(14, 2..4)), TestLoc(Loc::encapsulate_range(14, 4..6)),)
+            TupleAll(TestLoc(Loc::encapsulate_range(15, ..2)), TestLoc(Loc::encapsulate_range(15, 2..4)), TestLoc(Loc::encapsulate_range(15, 4..6)),)
                 .loc()
         ),
-        TestLoc(Loc::encapsulate_range(14, ..6))
+        TestLoc(Loc::encapsulate_range(15, ..6))
     );
-    assert_eq!(TestLoc(TupleNew(TestLoc(Loc::encapsulate_range(15, ..2)), TestLoc(Loc::encapsulate_range(15, 2..4))).loc()), TestLoc(Loc::new()));
     assert_eq!(
-        TestLoc(TupleGen(TestLoc(Loc::encapsulate_range(16, 0..2)), TestLoc(Loc::encapsulate_range(16, 2..4))).loc()),
-        TestLoc(Loc::encapsulate_range(16, 0..4))
+        TestLoc(TupleAllSkip(TestLoc(Loc::encapsulate_range(16, ..2)), "Hello, world!".into(), TestLoc(Loc::encapsulate_range(16, 2..4)),).loc()),
+        TestLoc(Loc::encapsulate_range(16, ..4))
+    );
+    assert_eq!(TestLoc(TupleNew(TestLoc(Loc::encapsulate_range(17, ..2)), TestLoc(Loc::encapsulate_range(17, 2..4))).loc()), TestLoc(Loc::new()));
+    assert_eq!(
+        TestLoc(TupleGen(TestLoc(Loc::encapsulate_range(18, 0..2)), TestLoc(Loc::encapsulate_range(18, 2..4))).loc()),
+        TestLoc(Loc::encapsulate_range(18, 0..4))
     );
 }
 
@@ -261,6 +290,18 @@ fn test_derive_located_enums() {
     }
 
     #[derive(Located)]
+    #[loc(all)]
+    enum EnumAllSkip {
+        Foo {
+            foo: TestLoc,
+            #[loc(skip)]
+            bar: String,
+            baz: TestLoc,
+        },
+        Bar(TestLoc, #[loc(skip)] String, TestLoc),
+    }
+
+    #[derive(Located)]
     enum EnumVariantAll {
         #[loc(all)]
         Foo {
@@ -270,6 +311,20 @@ fn test_derive_located_enums() {
         },
         #[loc(all)]
         Bar(TestLoc, TestLoc, TestLoc),
+        Baz(TestLoc, #[loc] TestLoc),
+    }
+
+    #[derive(Located)]
+    enum EnumVariantAllSkip {
+        #[loc(all)]
+        Foo {
+            foo: TestLoc,
+            #[loc(skip)]
+            bar: String,
+            baz: TestLoc,
+        },
+        #[loc(all)]
+        Bar(TestLoc, #[loc(skip)] String, TestLoc),
         Baz(TestLoc, #[loc] TestLoc),
     }
 
@@ -344,45 +399,82 @@ fn test_derive_located_enums() {
     );
     assert_eq!(
         TestLoc(
-            EnumVariantAll::Foo {
+            EnumAllSkip::Foo {
                 foo: TestLoc(Loc::encapsulate_range(13, ..2)),
-                bar: TestLoc(Loc::encapsulate_range(13, 2..4)),
-                baz: TestLoc(Loc::encapsulate_range(13, 4..6)),
+                bar: "Hello, world!".into(),
+                baz: TestLoc(Loc::encapsulate_range(13, 2..4)),
             }
             .loc()
         ),
-        TestLoc(Loc::encapsulate_range(13, ..6))
+        TestLoc(Loc::encapsulate_range(13, ..4))
+    );
+    assert_eq!(
+        TestLoc(EnumAllSkip::Bar(TestLoc(Loc::encapsulate_range(14, ..2)), "Hello, world!".into(), TestLoc(Loc::encapsulate_range(14, 2..4)),).loc()),
+        TestLoc(Loc::encapsulate_range(14, ..4))
+    );
+    assert_eq!(
+        TestLoc(
+            EnumVariantAll::Foo {
+                foo: TestLoc(Loc::encapsulate_range(15, ..2)),
+                bar: TestLoc(Loc::encapsulate_range(15, 2..4)),
+                baz: TestLoc(Loc::encapsulate_range(15, 4..6)),
+            }
+            .loc()
+        ),
+        TestLoc(Loc::encapsulate_range(15, ..6))
     );
     assert_eq!(
         TestLoc(
             EnumVariantAll::Bar(
-                TestLoc(Loc::encapsulate_range(14, ..2)),
-                TestLoc(Loc::encapsulate_range(14, 2..4)),
-                TestLoc(Loc::encapsulate_range(14, 4..6)),
+                TestLoc(Loc::encapsulate_range(16, ..2)),
+                TestLoc(Loc::encapsulate_range(16, 2..4)),
+                TestLoc(Loc::encapsulate_range(16, 4..6)),
             )
             .loc()
         ),
-        TestLoc(Loc::encapsulate_range(14, ..6))
+        TestLoc(Loc::encapsulate_range(16, ..6))
     );
     assert_eq!(
-        TestLoc(EnumVariantAll::Baz(TestLoc(Loc::encapsulate_range(15, ..2)), TestLoc(Loc::encapsulate_range(15, 2..4)),).loc()),
-        TestLoc(Loc::encapsulate_range(15, 2..4))
+        TestLoc(EnumVariantAll::Baz(TestLoc(Loc::encapsulate_range(17, ..2)), TestLoc(Loc::encapsulate_range(17, 2..4)),).loc()),
+        TestLoc(Loc::encapsulate_range(17, 2..4))
     );
     assert_eq!(
-        TestLoc(EnumNew::Foo { foo: TestLoc(Loc::encapsulate_range(16, ..2)), bar: TestLoc(Loc::encapsulate_range(16, 2..4)) }.loc()),
-        TestLoc(Loc::new())
-    );
-    assert_eq!(TestLoc(EnumNew::Bar(TestLoc(Loc::encapsulate_range(17, ..2)), TestLoc(Loc::encapsulate_range(17, 2..4))).loc()), TestLoc(Loc::new()));
-    assert_eq!(
-        TestLoc(EnumNewVariant::Foo { foo: TestLoc(Loc::encapsulate_range(18, ..2)), bar: TestLoc(Loc::encapsulate_range(18, 2..4)) }.loc()),
-        TestLoc(Loc::new())
-    );
-    assert_eq!(
-        TestLoc(EnumNewVariant::Bar(TestLoc(Loc::encapsulate_range(19, ..2)), TestLoc(Loc::encapsulate_range(19, 2..4))).loc()),
-        TestLoc(Loc::new())
+        TestLoc(
+            EnumVariantAllSkip::Foo {
+                foo: TestLoc(Loc::encapsulate_range(18, ..2)),
+                bar: "Hello, world!".into(),
+                baz: TestLoc(Loc::encapsulate_range(18, 4..6)),
+            }
+            .loc()
+        ),
+        TestLoc(Loc::encapsulate_range(18, ..6))
     );
     assert_eq!(
-        TestLoc(EnumNewVariant::Baz(TestLoc(Loc::encapsulate_range(20, ..2)), TestLoc(Loc::encapsulate_range(20, 2..4))).loc()),
+        TestLoc(
+            EnumVariantAllSkip::Bar(TestLoc(Loc::encapsulate_range(19, ..2)), "Hello, world!".into(), TestLoc(Loc::encapsulate_range(19, 4..6)),)
+                .loc()
+        ),
+        TestLoc(Loc::encapsulate_range(19, ..6))
+    );
+    assert_eq!(
+        TestLoc(EnumVariantAllSkip::Baz(TestLoc(Loc::encapsulate_range(20, ..2)), TestLoc(Loc::encapsulate_range(20, 2..4)),).loc()),
         TestLoc(Loc::encapsulate_range(20, 2..4))
+    );
+    assert_eq!(
+        TestLoc(EnumNew::Foo { foo: TestLoc(Loc::encapsulate_range(21, ..2)), bar: TestLoc(Loc::encapsulate_range(21, 2..4)) }.loc()),
+        TestLoc(Loc::new())
+    );
+    assert_eq!(TestLoc(EnumNew::Bar(TestLoc(Loc::encapsulate_range(22, ..2)), TestLoc(Loc::encapsulate_range(22, 2..4))).loc()), TestLoc(Loc::new()));
+    assert_eq!(
+        TestLoc(EnumNewVariant::Foo { foo: TestLoc(Loc::encapsulate_range(23, ..2)), bar: TestLoc(Loc::encapsulate_range(23, 2..4)) }.loc()),
+        TestLoc(Loc::new())
+    );
+    assert_eq!(
+        TestLoc(EnumNewVariant::Bar(TestLoc(Loc::encapsulate_range(24, ..2)), TestLoc(Loc::encapsulate_range(24, 2..4))).loc()),
+        TestLoc(Loc::new())
+    );
+    assert_eq!(
+        TestLoc(EnumNewVariant::Baz(TestLoc(Loc::encapsulate_range(25, ..2)), TestLoc(Loc::encapsulate_range(25, 2..4))).loc()),
+        TestLoc(Loc::encapsulate_range(25, 2..4))
     );
 }

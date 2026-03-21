@@ -29,8 +29,59 @@ fn has_loc_attr<'a>(attrs: impl IntoIterator<Item = &'a Attribute>) -> Result<bo
             // We only filter on our own attributes
             Meta::Path(p) if p.is_ident("loc") => return Ok(true),
             Meta::List(l) if l.path.is_ident("loc") => {
-                return Err(Error::new(l.path.span(), "Unsure what to do with attribute; at a field, use `#[loc]` or none."));
+                // Check the list to see if there's any illegal ones
+                let inner: Punctuated<Meta, Token![,]> = Punctuated::parse_terminated.parse2(l.tokens.clone())?;
+                if inner.is_empty() {
+                    // No attribute; pretend that it's `#[loc]`
+                    return Ok(true);
+                } else if inner.iter().all(|m| if let Meta::Path(p) = m { p.is_ident("skip") } else { false }) {
+                    // All of them are skip attributes. The message is clear.
+                    continue;
+                } else {
+                    // Something else!
+                    return Err(Error::new(l.path.span(), "Unsure what to do with attribute; at a field, use `#[loc]`, `#[loc(skip)]` or none."));
+                }
             },
+            // Never OK
+            Meta::NameValue(nv) if nv.path.is_ident("loc") => {
+                return Err(Error::new(nv.span(), "Unsure what to do with attribute; at a field, use `#[loc]`, `#[loc(skip)]` or none."));
+            },
+
+            // The rest we ignore, part of other crates (or macros)
+            _ => continue,
+        }
+    }
+    Ok(false)
+}
+
+/// Scans a list of attributes for the `#[loc(skip)]`-attribute.
+///
+/// # Arguments
+/// - `attrs`: Some list of attributes.
+///
+/// # Returns
+/// Whether the attribute was found or not.
+fn has_loc_skip_attr<'a>(attrs: impl IntoIterator<Item = &'a Attribute>) -> Result<bool, Error> {
+    for attr in attrs {
+        match &attr.meta {
+            // We only filter on our own attributes
+            Meta::List(l) if l.path.is_ident("loc") => {
+                // Check the list to see if there's any illegal ones
+                let inner: Punctuated<Meta, Token![,]> = Punctuated::parse_terminated.parse2(l.tokens.clone())?;
+                if inner.is_empty() {
+                    // No attribute; pretend that it's `#[loc]`
+                    continue;
+                } else if inner.iter().all(|m| if let Meta::Path(p) = m { p.is_ident("skip") } else { false }) {
+                    // All of them are skip attributes. The message is clear.
+                    return Ok(true);
+                } else {
+                    // Something else!
+                    return Err(Error::new(l.path.span(), "Unsure what to do with attribute; at a field, use `#[loc]`, `#[loc(skip)]` or none."));
+                }
+            },
+            // We do accept it but not relevant for us
+            Meta::Path(p) if p.is_ident("loc") => continue,
+            // Never OK
             Meta::NameValue(nv) if nv.path.is_ident("loc") => {
                 return Err(Error::new(nv.span(), "Unsure what to do with attribute; at a field, use `#[loc]` or none."));
             },
@@ -97,7 +148,18 @@ pub fn find_loc_fields<'a>(trt: &'static str, attrs: impl IntoIterator<Item = &'
 
     // Decide if we have global info
     if do_all.is_some() && do_new.is_none() {
-        return Ok((0..fields.len()).collect());
+        // We do all fields... except those with `skip`!
+        // NOTE: Some gymnastics are required here to deal with `has_loc_skip_attr()` possibly
+        // failing.
+        return Ok(fields
+            .iter()
+            .enumerate()
+            .filter_map(|(i, f)| match has_loc_skip_attr(&f.attrs) {
+                Ok(true) => None,
+                Ok(false) => Some(Ok(i)),
+                Err(err) => Some(Err(err)),
+            })
+            .collect::<Result<Vec<usize>, Error>>()?);
     } else if do_all.is_none() && do_new.is_some() {
         return Ok(Vec::new());
     } else if let (Some(_), Some(do_new)) = (do_all, do_new) {

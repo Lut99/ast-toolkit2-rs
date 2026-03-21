@@ -94,6 +94,20 @@ use proc_macro::TokenStream;
 ///
 /// assert_eq!(Quz { foo: Loc::encapsulate_range(0, ..2), bar: Loc::encapsulate_range(0, 2..4) }.loc(), Loc::encapsulate_range(0, ..4));
 /// ```
+/// where you can then exclude individual fields using `#[loc(skip)]`:
+/// ```ignore
+/// use ast_toolkit2::loc::{Loc, Located};
+///
+/// #[derive(Located)]
+/// #[loc(all)]
+/// struct Quz {
+///     #[loc(skip)]
+///     foo: String,
+///     bar: Loc,
+/// }
+///
+/// assert_eq!(Quz { foo: "Hello, world!".into(), bar: Loc::encapsulate_range(0, 2..4) }.loc(), Loc::encapsulate_range(0, 2..4));
+/// ```
 ///
 /// All of the above also works on enums:
 /// ```ignore
