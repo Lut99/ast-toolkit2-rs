@@ -48,8 +48,8 @@ use std::cmp::Ordering;
 use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
 
-#[cfg(feature = "macros")]
-pub use ast_toolkit2_macros::Located;
+#[cfg(feature = "proc-macros")]
+pub use ast_toolkit2_proc_macros::Located;
 pub use range::{Length, Range};
 pub use spec::Located;
 

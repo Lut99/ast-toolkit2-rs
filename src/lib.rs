@@ -39,8 +39,8 @@ pub mod prelude {
 /// Represents re-exports of macros.
 #[cfg(feature = "macros")]
 pub mod macros {
-    #[cfg(feature = "loc")]
-    pub use ast_toolkit2_macros::Located;
-    #[cfg(feature = "tree")]
-    pub use ast_toolkit2_macros::{Node, NonTerm, Term};
+    #[cfg(all(feature = "proc-macros", feature = "loc"))]
+    pub use ast_toolkit2_proc_macros::Located;
+    #[cfg(all(feature = "proc-macros", feature = "tree"))]
+    pub use ast_toolkit2_proc_macros::{Node, NonTerm, Term};
 }

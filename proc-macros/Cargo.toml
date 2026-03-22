@@ -1,5 +1,5 @@
 [package]
-name = "ast-toolkit2-macros"
+name = "ast-toolkit2-proc-macros"
 version = "0.1.0"
 edition = "2024"
 authors = ["Lut99"]

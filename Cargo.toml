@@ -11,24 +11,24 @@ description = "A (second) collection of libraries and macros for working with AS
 [[test]]
 name = "derive_located"
 path = "./tests/derive_located.rs"
-required-features = ["loc", "macros"]
+required-features = ["loc", "proc-macros"]
 
 [[test]]
 name = "derive_tag"
 path = "./tests/derive_tag.rs"
-required-features = ["loc", "macros", "tree"]
+required-features = ["loc", "proc-macros", "tree"]
 
 [[test]]
 name = "derive_tree"
 path = "./tests/derive_tree.rs"
-required-features = ["loc", "macros", "tree"]
+required-features = ["loc", "proc-macros", "tree"]
 
 
 [dependencies]
 serde = { version = "1.0.0", features = ["derive"], optional = true }
 thiserror = { version = "2.0.0", optional = true }
 
-ast-toolkit2-macros = { path = "./macros", optional = true }
+ast-toolkit2-proc-macros = { path = "./proc-macros", optional = true }
 
 
 [dev-dependencies]
@@ -43,19 +43,20 @@ parse = ["nibble"]
 
 # Functionality
 init = []
-loc = ["ast-toolkit2-macros/loc"]
+loc = ["ast-toolkit2-proc-macros/loc"]
 nibble = ["loc", "dep:thiserror"]
 punct = []
-tree = ["loc", "ast-toolkit2-macros/tree"]
+tree = ["loc", "ast-toolkit2-proc-macros/tree"]
 
 # Third-party
-macros = ["dep:ast-toolkit2-macros"]
+macros = ["proc-macros"]
+proc-macros = ["dep:ast-toolkit2-proc-macros"]
 serde = ["dep:serde"]
 
 
 [workspace]
 resolver = "3"
-members = ["./ast-toolkit2-build", "./macros"]
+members = ["./proc-macros"]
 
 
 [workspace.package]
