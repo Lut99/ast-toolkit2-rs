@@ -10,8 +10,6 @@
 mod iters;
 #[cfg(feature = "loc")]
 mod loc;
-#[cfg(feature = "macros")]
-mod macros;
 #[cfg(feature = "serde")]
 mod serde;
 
@@ -23,6 +21,8 @@ use std::mem::MaybeUninit;
 use std::ops::{Bound, Index, IndexMut, RangeBounds};
 
 // Bring some of it into this namespace
+#[cfg(feature = "decl-macros")]
+pub use ast_toolkit2_decl_macros::punct;
 pub use iters::*;
 
 // Define a module for putting all auxillary things in this module
@@ -1705,5 +1705,30 @@ mod tests {
                 punct
             }
         );
+    }
+
+    #[cfg(feature = "decl-macros")]
+    #[test]
+    fn test_punct_macro_empty() {
+        let p: Punctuated<&str, char> = punct![crate:];
+        assert_eq!(p, Punctuated::new());
+    }
+
+    #[cfg(feature = "decl-macros")]
+    #[test]
+    fn test_punct_macro_singleton() {
+        let p: Punctuated<&str, char> = punct![crate: "Hello"];
+        assert_eq!(p.len(), 1);
+        assert_eq!(p[0], "Hello");
+    }
+
+    #[cfg(feature = "decl-macros")]
+    #[test]
+    fn test_punct_macro_nonempty() {
+        let p: Punctuated<&str, char> = punct![crate: "Hello", ',', "world"];
+        assert_eq!(p.len(), 2);
+        assert_eq!(p[0], "Hello");
+        assert_eq!(p.get_punct(0), Some(&','));
+        assert_eq!(p[1], "world");
     }
 }

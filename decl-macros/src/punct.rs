@@ -1,4 +1,4 @@
-//  MACROS.rs
+//  PUNCT.rs
 //    by Lut99
 //
 //  Description:
@@ -15,9 +15,8 @@
 /// It returns a new [`Punctuated`](super::Punctuated).
 ///
 /// # Examples
-/// ```rust
-/// use ast_toolkit2::punct;
-/// use ast_toolkit2::punct::Punctuated;
+/// ```ignore
+/// use ast_toolkit2::punct::{Punctuated, punct};
 ///
 /// assert_eq!(format!("{:?}", punct!["Hello", ',', "world"]), "[\"Hello\", ',', \"world\"]");
 /// ```
@@ -44,41 +43,16 @@ macro_rules! punct {
     };
 
     /* Outward syntax */
-    [$($v:expr),* $(,)?] => {{
+    [crate: $($v:expr),* $(,)?] => {{
         #[allow(unused_mut)]
-        let mut __res = $crate::punct::Punctuated::with_capacity((1 + $crate::punct!(__count $($v),*)) / 2);
+        let mut __res = crate::punct::Punctuated::with_capacity((1 + $crate::punct!(__count $($v),*)) / 2);
         $crate::punct!{__odd(__res) $($v),*};
         __res
     }};
-}
-
-
-
-
-
-#[cfg(test)]
-mod tests {
-    use super::super::Punctuated;
-
-    #[test]
-    fn test_punct_empty() {
-        let p: Punctuated<&str, char> = punct![];
-        assert_eq!(p, Punctuated::new());
-    }
-
-    #[test]
-    fn test_punct_singleton() {
-        let p: Punctuated<&str, char> = punct!["Hello"];
-        assert_eq!(p.len(), 1);
-        assert_eq!(p[0], "Hello");
-    }
-
-    #[test]
-    fn test_punct_nonempty() {
-        let p: Punctuated<&str, char> = punct!["Hello", ',', "world"];
-        assert_eq!(p.len(), 2);
-        assert_eq!(p[0], "Hello");
-        assert_eq!(p.get_punct(0), Some(&','));
-        assert_eq!(p[1], "world");
-    }
+    [$($v:expr),* $(,)?] => {{
+        #[allow(unused_mut)]
+        let mut __res = ::ast_toolkit2::punct::Punctuated::with_capacity((1 + $crate::punct!(__count $($v),*)) / 2);
+        $crate::punct!{__odd(__res) $($v),*};
+        __res
+    }};
 }
