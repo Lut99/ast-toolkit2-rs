@@ -12,13 +12,15 @@ pub mod init;
 pub mod loc;
 #[cfg(feature = "nibble")]
 pub mod nibble;
+#[cfg(feature = "print")]
+pub mod print;
 #[cfg(feature = "punct")]
 pub mod punct;
 #[cfg(feature = "tree")]
 pub mod tree;
 
 // Aliases
-#[cfg(feature = "nibble")]
+#[cfg(feature = "parse")]
 pub use nibble as parse;
 
 /// Represents all the interfaces that are often used when working with the AST-toolkit and are
@@ -30,6 +32,8 @@ pub mod prelude {
     pub use super::loc::prelude::*;
     #[cfg(feature = "nibble")]
     pub use super::nibble::prelude::*;
+    #[cfg(feature = "print")]
+    pub use super::print::prelude::*;
     #[cfg(feature = "punct")]
     pub use super::punct::prelude::*;
     #[cfg(feature = "tree")]

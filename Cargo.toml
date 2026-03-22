@@ -25,8 +25,9 @@ required-features = ["loc", "proc-macros", "tree"]
 
 
 [dependencies]
-serde = { version = "1.0.0", features = ["derive"], optional = true }
-thiserror = { version = "2.0.0", optional = true }
+console = { version = "0.16.0", default-features = false, optional = true }
+serde = { version = "1.0.0", default-features = false, features = ["derive"], optional = true }
+thiserror = { version = "2.0.0", default-features = false, optional = true }
 
 ast-toolkit2-decl-macros = { path = "./decl-macros", optional = true }
 ast-toolkit2-proc-macros = { path = "./proc-macros", optional = true }
@@ -46,10 +47,12 @@ parse = ["nibble"]
 init = []
 loc = ["ast-toolkit2-proc-macros/loc"]
 nibble = ["loc", "dep:thiserror"]
+print = []
 punct = ["ast-toolkit2-decl-macros/punct"]
 tree = ["loc", "ast-toolkit2-proc-macros/tree"]
 
 # Third-party
+color = ["dep:console"]
 macros = ["decl-macros", "proc-macros"]
 decl-macros = ["dep:ast-toolkit2-decl-macros"]
 proc-macros = ["dep:ast-toolkit2-proc-macros"]
