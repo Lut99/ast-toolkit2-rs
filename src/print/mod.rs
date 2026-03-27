@@ -8,6 +8,8 @@
 // Modules
 mod display;
 mod fmt;
+#[cfg(feature = "color")]
+mod style;
 
 // Imports
 use std::cell::{Ref, RefMut};
@@ -101,7 +103,7 @@ pretty_print_ptr_impl!('a, RwLockWriteGuard<'a, T>);
 ///
 /// This trait is what you interact with as an end-user. To implement the trait for nodes, see
 /// [`PrettyPrint`] instead.
-pub trait PrettyPrintExt: PrettyPrint {
+pub trait PrettyPrintExt: PrettyPrint + Sized {
     /// Returns a pretty printer for this AST node that implements [`Display`].
     ///
     /// This option will never use coloring. If you want to, enable the `color`-feature and use
@@ -109,7 +111,7 @@ pub trait PrettyPrintExt: PrettyPrint {
     ///
     /// # Returns
     /// A [`Display`] struct that will render the nodes.
-    fn display(&self) -> ();
+    fn display(&self) -> Display<'_, Self>;
 
     /// Returns a pretty printer for this AST node that implements [`Display`].
     ///
@@ -123,14 +125,21 @@ pub trait PrettyPrintExt: PrettyPrint {
     /// # Returns
     /// A [`Display`] struct that will render the nodes.
     #[cfg(feature = "color")]
-    fn display_color(&self, coloring: Coloring) -> ();
+    fn display_color(&self, coloring: Coloring) -> Display<'_, Self>;
 }
 
 // Blanket impl for all `PrettyPrint`ing things
 impl<T: PrettyPrint> PrettyPrintExt for T {
     #[inline]
-    fn display(&self) -> () { todo!() }
+    fn display(&self) -> Display<'_, Self> {
+        Display(
+            self,
+            #[cfg(feature = "color")]
+            Coloring::Never,
+        )
+    }
 
+    #[cfg(feature = "color")]
     #[inline]
-    fn display_color(&self, coloring: Coloring) -> () { todo!() }
+    fn display_color(&self, coloring: Coloring) -> Display<'_, Self> { Display(self, coloring) }
 }
