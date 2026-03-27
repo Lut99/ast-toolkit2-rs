@@ -17,6 +17,8 @@ use std::fmt::Result as FResult;
 use std::rc::Rc;
 use std::sync::{Arc, MutexGuard, RwLockReadGuard, RwLockWriteGuard};
 
+#[cfg(feature = "decl-macros")]
+pub use ast_toolkit2_decl_macros::write_styled;
 pub use display::Display;
 pub use fmt::Formatter;
 

@@ -47,7 +47,7 @@ parse = ["nibble"]
 init = []
 loc = ["ast-toolkit2-proc-macros/loc"]
 nibble = ["loc", "dep:thiserror"]
-print = []
+print = ["ast-toolkit2-decl-macros/print"]
 punct = ["ast-toolkit2-decl-macros/punct"]
 tree = ["loc", "ast-toolkit2-proc-macros/tree"]
 

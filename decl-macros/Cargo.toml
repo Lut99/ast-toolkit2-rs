@@ -15,4 +15,5 @@ description = "Defines declarative macros for the ast-toolkit2 crate s.t. we can
 default = []
 
 # Functionality
+print = []
 punct = []

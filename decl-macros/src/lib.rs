@@ -7,5 +7,7 @@
 //
 
 // Modules
+#[cfg(feature = "print")]
+mod print;
 #[cfg(feature = "punct")]
 mod punct;
