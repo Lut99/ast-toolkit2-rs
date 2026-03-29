@@ -8,9 +8,7 @@
 
 use std::fmt::Result as FResult;
 
-#[cfg(feature = "color")]
-use crate::print::Formatter;
-use crate::print::{Coloring, PrettyPrint};
+use crate::print::{Coloring, Formatter, PrettyPrint};
 
 
 /***** LIBRARY *****/
