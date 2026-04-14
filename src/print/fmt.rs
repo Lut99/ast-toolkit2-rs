@@ -185,6 +185,15 @@ impl<'w> Formatter<'w> {
         }
     }
 
+    /// Returns the internal [`Coloring`] object.
+    ///
+    /// This is useful for creating a fresh Formatter with the same coloring options.
+    ///
+    /// # Returns
+    /// A [`Coloring`] that determines whether to do anything with given [`Style`]s.
+    #[inline]
+    pub const fn coloring(&self) -> Coloring { self.coloring }
+
 
 
     /// Runs code while the style is fixed.
