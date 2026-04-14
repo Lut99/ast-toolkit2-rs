@@ -86,9 +86,9 @@ impl<'w> Formatter<'w> {
     /// # Returns
     /// The result of `closure`.
     #[inline]
-    pub fn with_indent<R>(&mut self, closure: impl FnOnce() -> R) -> R {
+    pub fn with_indent<R>(&mut self, closure: impl FnOnce(&mut Self) -> R) -> R {
         self.add_indent();
-        let res: R = closure();
+        let res: R = closure(self);
         self.rem_indent();
         res
     }
@@ -197,9 +197,9 @@ impl<'w> Formatter<'w> {
     /// # Returns
     /// The result of `closure`.
     #[inline]
-    pub fn with_fixed_style<R>(&mut self, style: Style, closure: impl FnOnce() -> R) -> R {
+    pub fn with_fixed_style<R>(&mut self, style: Style, closure: impl FnOnce(&mut Self) -> R) -> R {
         self.fix_style(style);
-        let res: R = closure();
+        let res: R = closure(self);
         self.unfix_style();
         res
     }
