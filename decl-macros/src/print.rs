@@ -20,7 +20,7 @@
 /// ```
 #[macro_export]
 macro_rules! write_styled {
-    ($f:expr, $style:expr, $(t:tt)*) => {
+    ($f:expr, $style:expr, $($t:tt)*) => {
         ::std::write!($f, "{}", <$crate::Style>::apply_to($style, ::std::format_args!($($t)*)))
     };
 }
