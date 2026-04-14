@@ -15,16 +15,16 @@ use crate::print::{Coloring, Formatter, PrettyPrint};
 /// Turns something that's [`PrettyPrint`]able into something implementing
 /// [`Display`](std::fmt::Display).
 #[derive(Clone, Copy)]
-pub struct Display<'a, A>(pub(crate) &'a A, #[cfg(feature = "color")] pub(crate) Coloring);
+pub struct Display<'a, A: ?Sized>(pub(crate) &'a A, #[cfg(feature = "color")] pub(crate) Coloring);
 
 // Formatting
-impl<'a, A: PrettyPrint> std::fmt::Display for Display<'a, A> {
+impl<'a, A: ?Sized + PrettyPrint> std::fmt::Display for Display<'a, A> {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> FResult {
         #[cfg(feature = "color")]
         let mut f = Formatter::with_color(f, self.1);
         #[cfg(not(feature = "color"))]
         let mut f = Formatter::new(f);
-        PrettyPrint::fmt(&self.0, &mut f)
+        PrettyPrint::fmt(self.0, &mut f)
     }
 }

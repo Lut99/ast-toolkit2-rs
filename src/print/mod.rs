@@ -105,7 +105,7 @@ pretty_print_ptr_impl!('a, RwLockWriteGuard<'a, T>);
 ///
 /// This trait is what you interact with as an end-user. To implement the trait for nodes, see
 /// [`PrettyPrint`] instead.
-pub trait PrettyPrintExt: PrettyPrint + Sized {
+pub trait PrettyPrintExt: PrettyPrint {
     /// Returns a pretty printer for this AST node that implements [`Display`].
     ///
     /// This option will never use coloring. If you want to, enable the `color`-feature and use
