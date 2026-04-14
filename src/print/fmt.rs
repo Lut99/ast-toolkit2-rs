@@ -23,12 +23,14 @@ pub const INDENT: &'static str = "    ";
 /***** LIBRARY *****/
 pub struct Formatter<'w> {
     /// The writer we're a-writin' to
-    writer:   &'w mut dyn Write,
+    writer: &'w mut dyn Write,
     /// The number of spaces to write after every newline.
-    indent:   usize,
+    indent: usize,
+    /// Whether we're at the end of a line.
+    at_line_start: bool,
     /// The style to return on a [`Formatter::style()`]-call.
     #[cfg(feature = "color")]
-    style:    Style,
+    style: Style,
     /// Whether to apply ANSI-colors to the text resulting from this Formatter or not.
     #[cfg(feature = "color")]
     coloring: Coloring,
@@ -48,6 +50,7 @@ impl<'w> Formatter<'w> {
         Self {
             writer,
             indent: 0,
+            at_line_start: true,
             #[cfg(feature = "color")]
             style: Style::new(),
             #[cfg(feature = "color")]
@@ -67,7 +70,9 @@ impl<'w> Formatter<'w> {
     /// A new Formatter ready to format with your chosen color settings.
     #[cfg(feature = "color")]
     #[inline]
-    pub const fn with_color(writer: &'w mut dyn Write, coloring: Coloring) -> Self { Self { writer, indent: 0, style: Style::new(), coloring } }
+    pub const fn with_color(writer: &'w mut dyn Write, coloring: Coloring) -> Self {
+        Self { writer, indent: 0, at_line_start: true, style: Style::new(), coloring }
+    }
 }
 
 // Indentation
@@ -239,15 +244,16 @@ impl<'w> Write for Formatter<'w> {
     #[inline]
     fn write_str(&mut self, s: &str) -> FResult {
         for c in s.chars() {
-            // Always write the character
-            self.writer.write_char(c)?;
-
-            // Newlines see us writing the current indentation level
-            if c == '\n' {
+            // If we're at the start of a line, write indentation level
+            if self.at_line_start {
                 for _ in 0..self.indent {
                     self.writer.write_str(INDENT)?;
                 }
             }
+
+            // Always write the character
+            self.writer.write_char(c)?;
+            self.at_line_start = c == '\n';
         }
         Ok(())
     }
