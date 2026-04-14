@@ -21,6 +21,8 @@ use std::sync::{Arc, MutexGuard, RwLockReadGuard, RwLockWriteGuard};
 pub use ast_toolkit2_decl_macros::write_styled;
 pub use display::Display;
 pub use fmt::Formatter;
+#[cfg(feature = "color")]
+pub use style::Style;
 
 /// A module that collects all traits of the printing module in one importable location.
 pub mod prelude {
