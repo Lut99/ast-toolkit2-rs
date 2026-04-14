@@ -106,7 +106,7 @@ impl<'w> Formatter<'w> {
     /// Self for chaining.
     #[inline]
     pub const fn add_indent(&mut self) -> &mut Self {
-        self.indent += INDENT.len();
+        self.indent += 1;
         self
     }
 
@@ -121,7 +121,7 @@ impl<'w> Formatter<'w> {
     /// Self for chaining.
     #[inline]
     pub const fn add_n_indent(&mut self, n: usize) -> &mut Self {
-        self.indent += n * INDENT.len();
+        self.indent += n;
         self
     }
 
@@ -138,7 +138,7 @@ impl<'w> Formatter<'w> {
     /// Self for chaining.
     #[inline]
     pub const fn rem_indent(&mut self) -> &mut Self {
-        self.indent = self.indent.saturating_sub(INDENT.len());
+        self.indent = self.indent.saturating_sub(1);
         self
     }
 
@@ -154,7 +154,7 @@ impl<'w> Formatter<'w> {
     /// Self for chaining.
     #[inline]
     pub const fn rem_n_indent(&mut self, n: usize) -> &mut Self {
-        self.indent = self.indent.saturating_sub(n * INDENT.len());
+        self.indent = self.indent.saturating_sub(n);
         self
     }
 }
@@ -244,8 +244,7 @@ impl<'w> Write for Formatter<'w> {
 
             // Newlines see us writing the current indentation level
             if c == '\n' {
-                // NOTE: Indent is always a multiple of the indentation
-                for _ in 0..self.indent / INDENT.len() {
+                for _ in 0..self.indent {
                     self.writer.write_str(INDENT)?;
                 }
             }
