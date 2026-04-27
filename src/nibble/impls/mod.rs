@@ -7,6 +7,4 @@
 
 // The modules doing the implementations
 mod option;
-#[cfg(feature = "tree")]
-mod tag;
 mod vec;

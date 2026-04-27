@@ -14,11 +14,6 @@ path = "./tests/derive_located.rs"
 required-features = ["loc", "proc-macros"]
 
 [[test]]
-name = "derive_tag"
-path = "./tests/derive_tag.rs"
-required-features = ["loc", "proc-macros", "tree"]
-
-[[test]]
 name = "derive_tree"
 path = "./tests/derive_tree.rs"
 required-features = ["loc", "proc-macros", "tree"]

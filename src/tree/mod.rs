@@ -14,12 +14,13 @@
 //
 
 // Modules
-mod tag;
+use std::cell::{Ref, RefMut};
+use std::rc::Rc;
+use std::sync::{Arc, MutexGuard, RwLockReadGuard, RwLockWriteGuard};
 
 // Re-export some node macros
 #[cfg(feature = "proc-macros")]
-pub use ast_toolkit2_proc_macros::{Node, NonTerm, Tag, Term};
-pub use tag::Tag;
+pub use ast_toolkit2_proc_macros::{Node, NonTerm, Term};
 
 use crate::loc::Located;
 
@@ -27,6 +28,41 @@ use crate::loc::Located;
 pub mod prelude {
     pub use super::*;
 }
+
+
+/***** HELPER MACROS *****/
+/// Does pointer-like implementations for [`Node`].
+macro_rules! node_ptr_impl {
+    ('a, $ty:ty) => {
+        impl<'a, T: Node> Node for $ty {}
+    };
+    ($ty:ty) => {
+        impl<T: Node> Node for $ty {}
+    };
+}
+
+/// Does pointer-like implementations for [`NonTerm`].
+macro_rules! nonterm_ptr_impl {
+    ('a, $ty:ty) => {
+        impl<'a, T: NonTerm> NonTerm for $ty {}
+    };
+    ($ty:ty) => {
+        impl<T: NonTerm> NonTerm for $ty {}
+    };
+}
+
+/// Does pointer-like implementations for [`Term`].
+macro_rules! term_ptr_impl {
+    ('a, $ty:ty) => {
+        impl<'a, T: Term> Term for $ty {}
+    };
+    ($ty:ty) => {
+        impl<T: Term> Term for $ty {}
+    };
+}
+
+
+
 
 
 /***** INTERFACE *****/
@@ -47,6 +83,18 @@ pub mod prelude {
 /// Despite this difference, this trait represents the general part of the two.
 pub trait Node: Located {}
 
+// Pointer-like impls
+node_ptr_impl!('a, &'a T);
+node_ptr_impl!('a, &'a mut T);
+node_ptr_impl!(Box<T>);
+node_ptr_impl!(Rc<T>);
+node_ptr_impl!(Arc<T>);
+node_ptr_impl!('a, Ref<'a, T>);
+node_ptr_impl!('a, RefMut<'a, T>);
+node_ptr_impl!('a, MutexGuard<'a, T>);
+node_ptr_impl!('a, RwLockReadGuard<'a, T>);
+node_ptr_impl!('a, RwLockWriteGuard<'a, T>);
+
 
 
 /// Represents a "branch" [`Node`] in your AST.
@@ -57,6 +105,18 @@ pub trait Node: Located {}
 /// think of them as an understanding of a stream of [`Term`]inals.
 pub trait NonTerm: Node {}
 
+// Pointer-like impls
+nonterm_ptr_impl!('a, &'a T);
+nonterm_ptr_impl!('a, &'a mut T);
+nonterm_ptr_impl!(Box<T>);
+nonterm_ptr_impl!(Rc<T>);
+nonterm_ptr_impl!(Arc<T>);
+nonterm_ptr_impl!('a, Ref<'a, T>);
+nonterm_ptr_impl!('a, RefMut<'a, T>);
+nonterm_ptr_impl!('a, MutexGuard<'a, T>);
+nonterm_ptr_impl!('a, RwLockReadGuard<'a, T>);
+nonterm_ptr_impl!('a, RwLockWriteGuard<'a, T>);
+
 
 
 /// Represents a "leaf" [`Node`] in your AST.
@@ -65,3 +125,15 @@ pub trait NonTerm: Node {}
 /// syntax, and parsing them requires worrying about encodings, whitespaces, etc. You can think of
 /// them forming a stream of the input, and [`NonTerm`]inals an understanding of that stream.
 pub trait Term: Node {}
+
+// Pointer-like impls
+term_ptr_impl!('a, &'a T);
+term_ptr_impl!('a, &'a mut T);
+term_ptr_impl!(Box<T>);
+term_ptr_impl!(Rc<T>);
+term_ptr_impl!(Arc<T>);
+term_ptr_impl!('a, Ref<'a, T>);
+term_ptr_impl!('a, RefMut<'a, T>);
+term_ptr_impl!('a, MutexGuard<'a, T>);
+term_ptr_impl!('a, RwLockReadGuard<'a, T>);
+term_ptr_impl!('a, RwLockWriteGuard<'a, T>);
