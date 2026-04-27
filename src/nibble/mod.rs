@@ -16,7 +16,7 @@
 //
 
 // Modules
-mod error;
+pub mod error;
 mod impls;
 mod slice;
 
