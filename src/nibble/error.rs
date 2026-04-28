@@ -20,6 +20,13 @@ pub trait ResultExt<T, F, E> {
 
 
 
+    /// Allows one to call [`NibbleError::into_atleast()`] through a [`Result`].
+    ///
+    /// # Returns
+    /// A new instance of `Self` with any internal [`Needed::Bounded`] mapped to a
+    /// [`Needed::AtLeast`].
+    fn into_atleast(self) -> Result<T, NibbleError<F, E>>;
+
     /// Allows one to call [`NibbleError::auto_map()`] through a [`Result`].
     ///
     /// # Returns
@@ -57,6 +64,13 @@ impl<T, F, E> ResultExt<T, F, E> for Result<T, NibbleError<F, E>> {
 
 
     #[inline]
+    fn into_atleast(self) -> Result<T, NibbleError<F, E>> {
+        match self {
+            Err(NibbleError::Unmatched(fmt, Some(Needed::Bounded(min, _)))) => Err(NibbleError::Unmatched(fmt, Some(Needed::AtLeast(min)))),
+            res => res,
+        }
+    }
+    #[inline]
     fn auto_map<F2: From<F>, E2: From<E>>(self) -> Result<T, NibbleError<F2, E2>> {
         match self {
             Ok(res) => Ok(res),
@@ -93,9 +107,8 @@ pub enum Needed {
     /// The parser tells you that, for it to match the input, it will need between .0 and .1 (both
     /// **inclusive**) additional elements in the slice for it to match the input.
     ///
-    /// You usually see this with exact parsers like [tag parsers](crate::tree::Utf8Tag). In that
-    /// case, it may even be the case that .0 == .1 (i.e., the parser knows exactly how much more
-    /// it will need).
+    /// You usually see this with exact parsers. In that case, it may even be the case that .0 ==
+    /// .1 (i.e., the parser knows exactly how much more it will need).
     Bounded(usize, usize),
     /// The parser tells you that, for it to match the input, it will need at least this many more
     /// elements in the slice. But it may be more!
@@ -162,6 +175,25 @@ pub enum NibbleError<F, E> {
 
 // Mappers
 impl<F, E> NibbleError<F, E> {
+    /// If this NibbleError is a [`NibbleError::Unmatched`], then the [`Needed`] within it is
+    /// transformed from a [`Needed::Bounded`] to a [`Needed::AtLeast`].
+    ///
+    /// This seems like a hyper-specific usecase and it is. However, it occurs quite a lot when
+    /// using "fixed-size" parsers (e.g., parsing a tag) in greedy parsers (e.g., [`Vec`]).
+    /// Especially when they are prefixed, it pays to parse the prefix as a tag (with fixed size)
+    /// but report it as a minimum-size requirement.
+    ///
+    /// # Returns
+    /// A new instance of `Self` with any internal [`Needed::Bounded`] mapped to a
+    /// [`Needed::AtLeast`].
+    #[inline]
+    pub fn into_atleast(self) -> NibbleError<F, E> {
+        match self {
+            Self::Unmatched(fmt, Some(Needed::Bounded(min, _))) => Self::Unmatched(fmt, Some(Needed::AtLeast(min))),
+            err => err,
+        }
+    }
+
     /// Powerful version of a map function that attempts to automatically convert based on
     /// available [`From`]-implementations.
     ///
