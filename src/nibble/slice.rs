@@ -10,7 +10,7 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use std::ops::{Deref, RangeFrom};
 
 use super::{NibbleError, Parsable};
-use crate::loc::{Loc, Located};
+use crate::loc::{Length, Loc, Located};
 
 
 /***** LIBRARY *****/
@@ -288,6 +288,22 @@ impl<'a, T> Slice<'a, T> {
 }
 
 // Loc
+impl<'a, T> Slice<'a, T> {
+    /// Returns a [`Loc`] that points at the current point of the slice as an error.
+    ///
+    /// This is like [`Slice::loc()`], but instead of capturing the entire loc, it just points to
+    /// the start.
+    ///
+    /// # Returns
+    /// A [`Loc`] that points to the start of the current slice.
+    #[inline]
+    pub const fn error_loc(&self) -> Loc {
+        let mut loc = Loc::encapsulate(self.id);
+        loc.range.pos = self.offset as u64;
+        loc.range.len = Length::Indefinite;
+        loc
+    }
+}
 impl<'a, T> Located for Slice<'a, T> {
     #[inline]
     fn loc(&self) -> Loc { Loc::encapsulate_range(self.id, self.offset..self.slice.len()) }
