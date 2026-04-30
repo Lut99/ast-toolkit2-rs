@@ -6,6 +6,8 @@
 //
 
 // Declare the modules
+#[cfg(feature = "diag")]
+pub mod diag;
 #[cfg(feature = "init")]
 pub mod init;
 #[cfg(feature = "loc")]
