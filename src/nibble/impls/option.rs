@@ -47,7 +47,7 @@ impl<T: Parsable<E>, E> Parsable<E> for Option<T> {
     fn parse(input: Slice<E>) -> Result<(Self, Slice<E>), NibbleError<Self::Formatter, Self::Error>> {
         match T::parse(input) {
             Ok((res, rem)) => Ok((Some(res), rem)),
-            Err(NibbleError::Unmatched(_, _)) => Ok((None, input)),
+            Err(NibbleError::Unmatched(_, _) | NibbleError::NotEnough(_, _)) => Ok((None, input)),
             Err(NibbleError::Error(err)) => Err(NibbleError::Error(err)),
         }
     }

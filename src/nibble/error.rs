@@ -5,7 +5,11 @@
 //!   Defines errors for this crate.
 //
 
-use thiserror::Error;
+use std::error::Error;
+use std::fmt::{Debug, Display, Formatter, Result as FResult};
+
+use crate::loc::test::TestLoc;
+use crate::loc::{Loc, Located};
 
 
 /***** PRELUDE *****/
@@ -15,8 +19,9 @@ pub trait ResultExt<T, F, E> {
     ///
     /// # Returns
     /// The same but now the result is [`Some`] if it wasn't an error, or [`None`] if
-    /// [`NibbleError::Unmatched`] was the error.
-    fn transpose(self) -> Result<Option<T>, NibbleError<F, E>>;
+    /// [`NibbleError::Unmatched`] or [`NibbleError::NotEnough`] was the error. It still returns
+    /// [`Err`] if the error was [`NibbleError::Error`] (but now directly with the error).
+    fn transpose(self) -> Result<Option<T>, E>;
 
 
 
@@ -53,11 +58,12 @@ pub trait ResultExt<T, F, E> {
 }
 impl<T, F, E> ResultExt<T, F, E> for Result<T, NibbleError<F, E>> {
     #[inline]
-    fn transpose(self) -> Result<Option<T>, NibbleError<F, E>> {
+    fn transpose(self) -> Result<Option<T>, E> {
         match self {
             Ok(res) => Ok(Some(res)),
             Err(NibbleError::Unmatched(_, _)) => Ok(None),
-            Err(NibbleError::Error(err)) => Err(NibbleError::Error(err)),
+            Err(NibbleError::NotEnough(_, _)) => Ok(None),
+            Err(NibbleError::Error(err)) => Err(err),
         }
     }
 
@@ -66,8 +72,8 @@ impl<T, F, E> ResultExt<T, F, E> for Result<T, NibbleError<F, E>> {
     #[inline]
     fn into_atleast(self) -> Result<T, NibbleError<F, E>> {
         match self {
-            Err(NibbleError::Unmatched(fmt, Some(Needed::Bounded(min, _)))) => Err(NibbleError::Unmatched(fmt, Some(Needed::AtLeast(min)))),
-            res => res,
+            Ok(res) => Ok(res),
+            Err(err) => Err(err.into_atleast()),
         }
     }
     #[inline]
@@ -153,24 +159,28 @@ impl Needed {
 ///   encountered before the match could be made); and
 /// - [`NibbleError::Error`] represents that whatever you were trying to parse was matched but
 ///   illegal somehow, meaning that it _couldn't_ have been something else.
-#[derive(Debug, Error)]
+#[derive(Debug)]
 pub enum NibbleError<F, E> {
     /// Represents that what you were trying to parse was not recognized.
     ///
-    /// This implies something else might still parse this bit successfully.
+    /// This implies something else might still parse this bit successfully. However, it typically
+    /// implies that more input does _not_ change the outcome; i.e., there was something, but what
+    /// there was, was wrong.
     ///
-    /// The fields are something rendering what we expected and whether or not this error might be
-    /// fixed if more input is given (or rather, a match may be made given more input),
-    /// respectively.
-    #[error("{0}")]
-    Unmatched(F, Option<Needed>),
+    /// Consider using [`NibbleError::NotEnough`] instead if you want to communicate that the
+    /// problem was that there was not enough input, and more input may rectify the issue.
+    Unmatched(F, Loc),
+    /// Represents that what you were trying to parse wasn't recognized but not due to incorrect
+    /// input, but rather a lack of it.
+    ///
+    /// It communicates to the user that more input may cause this branch to succeed instead.
+    NotEnough(Needed, Loc),
     /// Represents that what you were trying to parse was recognized, but illegal.
     ///
     /// This implies something else won't parse this bit successfully either.
     ///
     /// The field is the nested error further describing what went wrong.
-    #[error("{0}")]
-    Error(#[from] E),
+    Error(E),
 }
 
 // Mappers
@@ -189,7 +199,7 @@ impl<F, E> NibbleError<F, E> {
     #[inline]
     pub fn into_atleast(self) -> NibbleError<F, E> {
         match self {
-            Self::Unmatched(fmt, Some(Needed::Bounded(min, _))) => Self::Unmatched(fmt, Some(Needed::AtLeast(min))),
+            Self::NotEnough(Needed::Bounded(min, _), loc) => Self::NotEnough(Needed::AtLeast(min), loc),
             err => err,
         }
     }
@@ -202,7 +212,8 @@ impl<F, E> NibbleError<F, E> {
     #[inline]
     pub fn auto_map<F2: From<F>, E2: From<E>>(self) -> NibbleError<F2, E2> {
         match self {
-            Self::Unmatched(fmt, needed) => NibbleError::Unmatched(fmt.into(), needed),
+            Self::Unmatched(fmt, loc) => NibbleError::Unmatched(fmt.into(), loc),
+            Self::NotEnough(needed, loc) => NibbleError::NotEnough(needed, loc),
             Self::Error(err) => NibbleError::Error(err.into()),
         }
     }
@@ -221,7 +232,8 @@ impl<F, E> NibbleError<F, E> {
     #[inline]
     pub fn map_fmt<F2, E2: From<E>>(self, map: impl FnOnce(F) -> F2) -> NibbleError<F2, E2> {
         match self {
-            Self::Unmatched(fmt, needed) => NibbleError::Unmatched(map(fmt), needed),
+            Self::Unmatched(fmt, loc) => NibbleError::Unmatched(map(fmt), loc),
+            Self::NotEnough(needed, loc) => NibbleError::NotEnough(needed, loc),
             Self::Error(err) => NibbleError::Error(err.into()),
         }
     }
@@ -240,10 +252,44 @@ impl<F, E> NibbleError<F, E> {
     #[inline]
     pub fn map_nerr<F2: From<F>, E2>(self, map: impl FnOnce(E) -> E2) -> NibbleError<F2, E2> {
         match self {
-            Self::Unmatched(fmt, needed) => NibbleError::Unmatched(fmt.into(), needed),
+            Self::Unmatched(fmt, loc) => NibbleError::Unmatched(fmt.into(), loc),
+            Self::NotEnough(needed, loc) => NibbleError::NotEnough(needed, loc),
             Self::Error(err) => NibbleError::Error(map(err)),
         }
     }
+}
+
+// Error
+impl<F: Display, E: Display> Display for NibbleError<F, E> {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter<'_>) -> FResult {
+        match self {
+            Self::Unmatched(fmt, _) => Display::fmt(fmt, f),
+            Self::NotEnough(Needed::Bounded(min, max), _) if min == max => {
+                write!(f, "Unexpected end of input (expected {min} elements more)")
+            },
+            Self::NotEnough(Needed::Bounded(min, max), _) => {
+                write!(f, "Unexpected end of input (expected at least {min}, at most {max} elements more)")
+            },
+            Self::NotEnough(Needed::AtLeast(min), _) => write!(f, "Unexpected end of input (expected at least {min} elements more)"),
+            Self::NotEnough(Needed::Unknown, _) => write!(f, "Unexpected end of input"),
+            Self::Error(err) => Display::fmt(err, f),
+        }
+    }
+}
+impl<F: Debug + Display, E: Error> Error for NibbleError<F, E> {
+    #[inline]
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::Unmatched(_, _) => None,
+            Self::NotEnough(_, _) => None,
+            Self::Error(err) => err.source(),
+        }
+    }
+}
+impl<F, E> From<E> for NibbleError<F, E> {
+    #[inline]
+    fn from(value: E) -> Self { Self::Error(value) }
 }
 
 // Ops
@@ -252,9 +298,22 @@ impl<F: PartialEq, E: PartialEq> PartialEq for NibbleError<F, E> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::Unmatched(lhs1, lhs2), Self::Unmatched(rhs1, rhs2)) => lhs1 == rhs1 && lhs2 == rhs2,
+            (Self::Unmatched(fmt1, loc1), Self::Unmatched(fmt2, loc2)) => fmt1 == fmt2 && TestLoc(*loc1) == TestLoc(*loc2),
+            (Self::NotEnough(needed1, loc1), Self::NotEnough(needed2, loc2)) => needed1 == needed2 && TestLoc(*loc1) == TestLoc(*loc2),
             (Self::Error(lhs), Self::Error(rhs)) => lhs == rhs,
             _ => false,
+        }
+    }
+}
+
+// Loc
+impl<F, E: Located> Located for NibbleError<F, E> {
+    #[inline]
+    fn loc(&self) -> Loc {
+        match self {
+            Self::Unmatched(_, loc) => *loc,
+            Self::NotEnough(_, loc) => *loc,
+            Self::Error(err) => err.loc(),
         }
     }
 }

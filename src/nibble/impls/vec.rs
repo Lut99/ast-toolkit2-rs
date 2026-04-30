@@ -7,7 +7,7 @@
 
 use std::fmt::{Display, Formatter, Result as FResult};
 
-use super::super::error::ResultExt;
+use super::super::error::ResultExt as _;
 use super::super::{NibbleError, Parsable, Slice};
 
 
@@ -48,7 +48,7 @@ impl<E, T: Parsable<E>> Parsable<E> for Vec<T> {
         // because of the brute-force nature of the parser, and we'll probably see more failing
         // calls then successful calls.
         let mut res = Vec::new();
-        while let Some((item, rem)) = input.parse::<T>().transpose().auto_map()? {
+        while let Some((item, rem)) = input.parse::<T>().transpose().map_err(NibbleError::Error)? {
             // Do some optimized scaling if necessary
             if res.is_empty() {
                 res.reserve(4);
