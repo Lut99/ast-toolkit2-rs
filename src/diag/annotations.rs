@@ -38,7 +38,7 @@ pub enum Severity {
 
 /***** LIBRARY *****/
 /// Defines annotations that can be given in a snippet.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Annotation {
     /// Defines any visual suggested replacement for the underlying `S`ource text.
     pub repl: Option<String>,

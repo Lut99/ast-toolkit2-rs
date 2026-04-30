@@ -15,7 +15,11 @@ mod diag;
 mod themes;
 
 // Use 'em
+pub use annotations::{Annotation, Severity};
+#[cfg(feature = "proc-macros")]
+pub use ast_toolkit2_proc_macros::Diagnostic;
 pub use diag::Diag;
+pub use themes::Theme;
 
 
 /***** SPECIFICATIONS *****/

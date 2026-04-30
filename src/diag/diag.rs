@@ -20,7 +20,7 @@ use super::themes::Theme;
 ///
 /// If you enabled `proc-macros`, then likely, you never have interact with this type yourself. Use
 /// the [`Diagnostic`](super::Diagnostic) derive macro instead.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Diag {
     /// The style to apply while rendering.
     pub theme: Theme,

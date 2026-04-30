@@ -9,6 +9,11 @@ description = "A (second) collection of libraries and macros for working with AS
 
 
 [[test]]
+name = "derive_diagnostic"
+path = "./tests/derive_diagnostic.rs"
+required-features = ["diag", "loc", "proc-macros"]
+
+[[test]]
 name = "derive_located"
 path = "./tests/derive_located.rs"
 required-features = ["loc", "proc-macros"]
@@ -39,7 +44,7 @@ diagnostic = ["diag"]
 parse = ["nibble"]
 
 # Functionality
-diag = ["loc"]
+diag = ["loc", "ast-toolkit2-proc-macros/diag"]
 init = []
 loc = ["ast-toolkit2-proc-macros/loc"]
 nibble = ["loc"]

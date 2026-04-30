@@ -8,6 +8,8 @@
 // Modules
 #[cfg(any(feature = "loc", feature = "tree"))]
 mod common;
+#[cfg(feature = "diag")]
+mod derive_diagnostic;
 #[cfg(feature = "loc")]
 mod derive_located;
 #[cfg(feature = "tree")]
@@ -23,6 +25,20 @@ use proc_macro::TokenStream;
 
 
 /***** LIBRARY *****/
+/// A procedural macro for automatically deriving the `Diagnostic`-trait.
+///
+/// TODO
+#[cfg(feature = "diag")]
+#[proc_macro_derive(Diagnostic, attributes(diag, annot))]
+pub fn derive_diagnostic(item: TokenStream) -> TokenStream {
+    match derive_diagnostic::handle(item.into()) {
+        Ok(res) => res.into(),
+        Err(err) => err.into_compile_error().into(),
+    }
+}
+
+
+
 /// A procedural macro for automatically deriving the `Located`-trait.
 ///
 /// By default, this will just return one of the fields of your type when `Located::loc()` is
