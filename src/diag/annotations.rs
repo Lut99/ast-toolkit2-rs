@@ -41,13 +41,86 @@ pub enum Severity {
 #[derive(Clone, Debug)]
 pub struct Annotation {
     /// Defines any visual suggested replacement for the underlying `S`ource text.
-    pub replacement: Option<String>,
+    pub repl: Option<String>,
     /// Defines any message to give with this annotation.
-    pub message: Option<String>,
+    pub msg:  Option<String>,
     /// The severity (= color and markers like "error" or "help") of this annotation.
-    pub severity: Severity,
+    pub sev:  Severity,
     /// Defines the place in the source describing what this annotation highlights.
-    pub loc: Loc,
+    pub loc:  Loc,
+}
+
+// Constructors
+impl Annotation {
+    /// Creates a new annotation.
+    ///
+    /// # Arguments
+    /// - `sev`: A [`Severity`] describing the type of annotation.
+    /// - `loc`: A [`Loc`] describing the position in the source text that this annotation
+    ///   annotates.
+    ///
+    /// # Returns
+    /// A new Annotation ready to annotate.
+    #[inline]
+    pub const fn new(sev: Severity, loc: Loc) -> Self { Self { repl: None, msg: None, sev, loc } }
+
+    /// Creates a new annotation describing an error.
+    ///
+    /// If you want to add a message separate from the main message, call
+    /// [`Annotation::with_msg()`].
+    ///
+    /// # Arguments
+    /// - `loc`: A [`Loc`] describing the position in the source text that this annotation
+    ///   annotates.
+    ///
+    /// # Returns
+    /// A new Annotation ready to annotate.
+    #[inline]
+    pub const fn error(loc: Loc) -> Self { Self::new(Severity::Error, loc) }
+
+    /// Creates a new annotation describing a hint.
+    ///
+    /// If you want to add a message separate from the main message, call
+    /// [`Annotation::with_msg()`].
+    ///
+    /// # Arguments
+    /// - `msg`: A message to pair
+    /// - `loc`: A [`Loc`] describing the position in the source text that this annotation
+    ///   annotates.
+    ///
+    /// # Returns
+    /// A new Annotation ready to annotate.
+    #[inline]
+    pub const fn help(loc: Loc) -> Self { Self::new(Severity::Help, loc) }
+
+    /// Creates a new annotation describing a suggestion.
+    ///
+    /// If you want to add a message separate from the main message, call
+    /// [`Annotation::with_msg()`]. Similarly, a suggested replacement can be added with
+    /// [`Annotation::with_repl()`].
+    ///
+    /// # Arguments
+    /// - `loc`: A [`Loc`] describing the position in the source text that this annotation
+    ///   annotates.
+    ///
+    /// # Returns
+    /// A new Annotation ready to annotate.
+    #[inline]
+    pub const fn suggestion(loc: Loc) -> Self { Self::new(Severity::Suggestion, loc) }
+
+    /// Creates a new annotation describing a warning.
+    ///
+    /// If you want to add a message separate from the main message, call
+    /// [`Annotation::with_msg()`].
+    ///
+    /// # Arguments
+    /// - `loc`: A [`Loc`] describing the position in the source text that this annotation
+    ///   annotates.
+    ///
+    /// # Returns
+    /// A new Annotation ready to annotate.
+    #[inline]
+    pub const fn warning(loc: Loc) -> Self { Self::new(Severity::Warning, loc) }
 }
 
 // Loc

@@ -160,7 +160,7 @@ impl Diag {
 
     /// Adds a new [`Annotation`] to this Diag.
     ///
-    /// To remove it again, manually filter it from the [`Diag::annots`].
+    /// To remove it again, manually filter it from the [`Diag::annots`] vector.
     ///
     /// # Arguments
     /// - `annot`: The [`Annotation`] to add to this Diag.

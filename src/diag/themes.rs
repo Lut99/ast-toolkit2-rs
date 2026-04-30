@@ -19,4 +19,7 @@ pub struct Theme {}
 impl Theme {
     /// The plain theme does not color anything, and is hence the most basic theme you can find.
     pub const PLAIN: Self = Self {};
+
+    /// Simulates colors as used by the Rust compiler.
+    pub const RUST: Self = Self {};
 }
