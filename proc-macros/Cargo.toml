@@ -22,6 +22,6 @@ quote = { version = "1.0.0", default-features = false, optional = true }
 default = []
 
 # Functionality
-diag = ["dep:proc-macro2", "dep:syn", "dep:quote", "syn/derive"]
+diag = ["dep:proc-macro2", "dep:syn", "dep:quote", "syn/derive", "syn/visit-mut"]
 loc = ["dep:proc-macro2", "dep:syn", "dep:quote", "syn/derive", "syn/printing"]
 tree = ["dep:proc-macro2", "dep:syn", "dep:quote"]

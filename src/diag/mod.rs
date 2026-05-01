@@ -9,13 +9,13 @@
 //
 
 // Declare the nested modules
-mod annotations;
+mod annots;
 mod diag;
 // mod layout;
 mod themes;
 
 // Use 'em
-pub use annotations::{Annotation, Severity};
+pub use annots::{Annotation, Severity};
 #[cfg(feature = "proc-macros")]
 pub use ast_toolkit2_proc_macros::Diagnostic;
 pub use diag::Diag;

@@ -7,7 +7,7 @@
 //
 
 use super::Diagnostic;
-use super::annotations::{Annotation, Severity};
+use super::annots::{Annotation, Severity};
 use super::themes::Theme;
 
 

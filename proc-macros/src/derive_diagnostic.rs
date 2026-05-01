@@ -5,14 +5,13 @@
 //!   Implements the derive macro for `Diagnostic`.
 //
 
-use std::borrow::Cow;
-
 use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::{ToTokens, quote};
 use syn::parse::{Parse, ParseStream, Parser as _};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::token::Paren;
+use syn::visit_mut::VisitMut;
 use syn::{
     Attribute, Data, DataUnion, DeriveInput, Error, Expr, ExprLit, ExprPath, Fields, Ident, Lit, LitStr, Meta, Path, PathSegment, Token,
     parenthesized,
@@ -86,6 +85,13 @@ fn parse_loc_expr(input: ParseStream) -> Result<Expr, Error> {
     } else {
         Err(input.error("Expected either nothing or `= <expr>`"))
     }
+}
+
+/// Takes some [`syn`] object and ensures that all identifiers are resolved in the mixed scope.
+struct IdentVisitor;
+impl VisitMut for IdentVisitor {
+    fn visit_ident_mut(&mut self, ident: &mut Ident) { ident.set_span(Span::mixed_site()); }
+    fn visit_lit_str_mut(&mut self, lstr: &mut LitStr) { lstr.set_span(Span::mixed_site()); }
 }
 
 /// Takes an optional format string, then renders it
@@ -347,10 +353,17 @@ impl Diag {
                     let asev: Severity = asev.ok_or_else(|| {
                         Error::new(l.path.span(), "Missing severity specifier (i.e., `error`, `help`, `suggestion` or `warn`/`warning`)")
                     })?;
-                    let aloc: Expr =
+                    let mut aloc: Expr =
                         aloc.ok_or_else(|| Error::new(l.path.span(), "Missing `loc`-specifier (i.e., `loc = <...>` or `loc` to imply `loc = loc`)"))?;
 
                     // Add the annotations
+                    for expr in amsg.iter_mut().flat_map(Punctuated::iter_mut) {
+                        syn::visit_mut::visit_expr_mut(&mut IdentVisitor, expr);
+                    }
+                    for expr in arepl.iter_mut().flat_map(Punctuated::iter_mut) {
+                        syn::visit_mut::visit_expr_mut(&mut IdentVisitor, expr);
+                    }
+                    syn::visit_mut::visit_expr_mut(&mut IdentVisitor, &mut aloc);
                     annots.push(Annot { sev: asev, msg: amsg, repl: arepl, loc: aloc });
                 },
 
@@ -379,13 +392,19 @@ impl Diag {
         // Unwrap the toplevel values
         let sev: Severity =
             sev.ok_or_else(|| Error::new(topspan, "Missing main severity specifier (i.e., `error`, `help`, `suggestion` or `warn`/`warning`)"))?;
-        let msg: Punctuated<Expr, Token![,]> = msg.ok_or_else(|| Error::new(topspan, "Missing main message"))?;
+        let mut msg: Punctuated<Expr, Token![,]> = msg.ok_or_else(|| Error::new(topspan, "Missing main message"))?;
         if let Some(loc) = loc {
             // Generate the implicit annotation here
             annots.insert(0, Annot { sev, msg: None, repl: None, loc });
         }
 
         // Build the final struct
+        for expr in code.iter_mut().flat_map(Punctuated::iter_mut) {
+            syn::visit_mut::visit_expr_mut(&mut IdentVisitor, expr);
+        }
+        for expr in msg.iter_mut() {
+            syn::visit_mut::visit_expr_mut(&mut IdentVisitor, expr);
+        }
         Ok(Diag { sev, code, msg, annots })
     }
 }
