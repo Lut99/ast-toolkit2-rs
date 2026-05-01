@@ -19,8 +19,11 @@ use syn::{
 
 
 /***** HELPER FUNCTIONS *****/
-/// Generates the field expansion (i.e., `let Self { ... } = self`) of a set of [`Fields`].
-fn generate_field_expansion(fields: &Fields) -> TokenStream2 {
+/// Generates the field expansion (i.e., `{...}` in `let Self { ... } = self`) of a set of [`Fields`].
+///
+/// The boolean indicates whether the fields have names (i.e., struct syntax) or are implicit
+/// (i.e., tuple syntax).
+fn generate_field_expansion(fields: &Fields) -> (bool, TokenStream2) {
     let mut has_names: bool = false;
     let fields: Vec<Ident> = fields
         .iter()
@@ -30,14 +33,33 @@ fn generate_field_expansion(fields: &Fields) -> TokenStream2 {
                 has_names = true;
                 Ident::new(&ident.to_string(), Span::mixed_site())
             } else {
-                Ident::new(&format!("field{i}"), Span::mixed_site())
+                Ident::new(&format!("f{i}"), Span::mixed_site())
             }
         })
         .collect();
+
+    (has_names, quote!(#(#fields),*))
+}
+
+/// Generates the field expansion for structs (`let Self { ... } = self`).
+#[inline]
+fn generate_field_expansion_struct(fields: &Fields) -> TokenStream2 {
+    let (has_names, exp) = generate_field_expansion(fields);
     if has_names {
-        quote! { let Self { #(#fields),* } = self; }
+        quote! { let Self { #exp } = self; }
     } else {
-        quote! { let Self ( #(#fields),* ) = self; }
+        quote! { let Self ( #exp ) = self; }
+    }
+}
+
+/// Generates the field expansion for enum variants (`Self::$variant { ... }`).
+#[inline]
+fn generate_field_expansion_variant(variant: &Ident, fields: &Fields) -> TokenStream2 {
+    let (has_names, exp) = generate_field_expansion(fields);
+    if has_names {
+        quote! { Self::#variant { #exp } }
+    } else {
+        quote! { Self::#variant ( #exp ) }
     }
 }
 
@@ -94,10 +116,16 @@ impl VisitMut for IdentVisitor {
     fn visit_lit_str_mut(&mut self, lstr: &mut LitStr) { lstr.set_span(Span::mixed_site()); }
 }
 
+/// Takes a format string, then renders it
+fn render_fstr_as_string_nonopt(exprs: &Punctuated<Expr, Token![,]>) -> TokenStream2 { quote!(::std::format!(#exprs)) }
+
 /// Takes an optional format string, then renders it
 fn render_fstr_as_string(exprs: &Option<Punctuated<Expr, Token![,]>>) -> TokenStream2 {
     match exprs {
-        Some(exprs) => quote! { ::std::option::Option::Some(::std::format!(#exprs)) },
+        Some(exprs) => {
+            let format = render_fstr_as_string_nonopt(exprs);
+            quote! { ::std::option::Option::Some(#format) }
+        },
         None => quote! { ::std::option::Option::None },
     }
 }
@@ -423,7 +451,7 @@ pub fn handle(item: TokenStream2) -> Result<TokenStream2, Error> {
             let diag = Diag::parse_from_attrs(ident.span(), &attrs)?;
 
             // Generate the field expansion of the struct
-            let fields: TokenStream2 = generate_field_expansion(&s.fields);
+            let fields: TokenStream2 = generate_field_expansion_struct(&s.fields);
 
             // Generate individual annotations
             let annots: Vec<TokenStream2> = diag.generate_annots();
@@ -431,7 +459,7 @@ pub fn handle(item: TokenStream2) -> Result<TokenStream2, Error> {
             // Then build
             let sev: Severity = diag.sev;
             let code: TokenStream2 = render_fstr_as_string(&diag.code);
-            let msg: &Punctuated<Expr, Token![,]> = &diag.msg;
+            let msg: TokenStream2 = render_fstr_as_string_nonopt(&diag.msg);
             let (impl_gen, ty_gen, where_clauses) = generics.split_for_impl();
             Ok(quote! {
                 impl #impl_gen ::ast_toolkit2::diag::Diagnostic for #ident #ty_gen #where_clauses {
@@ -443,7 +471,7 @@ pub fn handle(item: TokenStream2) -> Result<TokenStream2, Error> {
 
                             sev: #sev,
                             code: #code,
-                            msg: ::std::format!(#msg),
+                            msg: #msg,
 
                             annots: ::std::vec![#(#annots),*],
                         }
@@ -452,12 +480,44 @@ pub fn handle(item: TokenStream2) -> Result<TokenStream2, Error> {
             })
         },
         Data::Enum(e) => {
+            // Go through each variant
+            let mut variants: Vec<TokenStream2> = Vec::with_capacity(e.variants.len());
+            for variant in e.variants {
+                // Parse toplevel attributes first
+                let diag = Diag::parse_from_attrs(variant.ident.span(), &variant.attrs)?;
+
+                // Generate the variant expansion
+                let match_arm: TokenStream2 = generate_field_expansion_variant(&variant.ident, &variant.fields);
+
+                // Generate individual annotations
+                let annots: Vec<TokenStream2> = diag.generate_annots();
+
+                // Then build the individual match arm
+                let sev: Severity = diag.sev;
+                let code: TokenStream2 = render_fstr_as_string(&diag.code);
+                let msg: TokenStream2 = render_fstr_as_string_nonopt(&diag.msg);
+                variants.push(quote! {
+                    #match_arm => ::ast_toolkit2::diag::Diag {
+                        theme: ::ast_toolkit2::diag::Theme::PLAIN,
+
+                        sev: #sev,
+                        code: #code,
+                        msg: #msg,
+
+                        annots: ::std::vec![#(#annots),*],
+                    },
+                });
+            }
+
+            // Now build the overall thing
             let (impl_gen, ty_gen, where_clauses) = generics.split_for_impl();
             Ok(quote! {
                 impl #impl_gen ::ast_toolkit2::diag::Diagnostic for #ident #ty_gen #where_clauses {
                     #[inline]
                     fn into_diag(self) -> ::ast_toolkit2::diag::Diag {
-                        ::std::todo!();
+                        match self {
+                            #(#variants)*
+                        }
                     }
                 }
             })
