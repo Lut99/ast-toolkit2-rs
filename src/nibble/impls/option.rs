@@ -13,7 +13,7 @@ use super::super::{NibbleError, Parsable};
 
 /***** FORMATTERS *****/
 /// Formatter for [`Option::expects()`].
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct OptionFormatter<F> {
     fmt: F,
 }

@@ -19,6 +19,11 @@ path = "./tests/derive_located.rs"
 required-features = ["loc", "proc-macros"]
 
 [[test]]
+name = "derive_parsable"
+path = "./tests/derive_parsable.rs"
+required-features = ["nibble", "loc", "proc-macros"]
+
+[[test]]
 name = "derive_tree"
 path = "./tests/derive_tree.rs"
 required-features = ["loc", "proc-macros", "tree"]
@@ -26,6 +31,7 @@ required-features = ["loc", "proc-macros", "tree"]
 
 [dependencies]
 console = { version = "0.16.0", default-features = false, features = ["std"], optional = true }
+regex = { version = "1.13.0", default-features = false, optional = true }
 serde = { version = "1.0.0", default-features = false, features = ["derive"], optional = true }
 
 ast-toolkit2-decl-macros = { path = "./decl-macros", optional = true }
@@ -47,7 +53,7 @@ parse = ["nibble"]
 diag = ["loc", "ast-toolkit2-proc-macros/diag"]
 init = []
 loc = ["ast-toolkit2-proc-macros/loc"]
-nibble = ["loc"]
+nibble = ["dep:regex", "ast-toolkit2-proc-macros/nibble", "loc"]
 print = ["ast-toolkit2-decl-macros/print"]
 punct = ["ast-toolkit2-decl-macros/punct"]
 tree = ["loc", "ast-toolkit2-proc-macros/tree"]

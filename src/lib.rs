@@ -21,10 +21,6 @@ pub mod punct;
 #[cfg(feature = "tree")]
 pub mod tree;
 
-// Aliases
-#[cfg(feature = "parse")]
-pub use nibble as parse;
-
 /// Represents all the interfaces that are often used when working with the AST-toolkit and are
 /// thus useful to "import by default".
 pub mod prelude {

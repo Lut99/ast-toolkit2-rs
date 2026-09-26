@@ -3,7 +3,7 @@
 //
 //  Description:
 //!   Defines the `nibble` parse library of the `ast-toolkit2`.
-//!   
+//!
 //!   It is the spiritual successor of the
 //!   [`ast-toolkit-snack`](https://github.com/Lut99/ast-toolkit-rs/tree/main/lib/ast-toolkit-snack)-library,
 //!   which in turn is a conceptual fork of [`nom`](https://github.com/rust-bakery/nom).
@@ -16,6 +16,7 @@
 //
 
 // Modules
+mod convert;
 pub mod error;
 mod impls;
 mod slice;
@@ -24,6 +25,9 @@ mod slice;
 use std::error::Error;
 use std::fmt::Display;
 
+#[cfg(feature = "proc-macros")]
+pub use ast_toolkit2_proc_macros::Parsable;
+pub use convert::Convert;
 pub use error::NibbleError;
 pub use slice::Slice;
 
@@ -31,6 +35,13 @@ pub use slice::Slice;
 pub mod prelude {
     pub use super::error::ResultExt;
     pub use super::{Parsable, Slice};
+}
+
+/// "Secret" module for re-exporting things for procedural macros.
+#[cfg(feature = "proc-macros")]
+#[doc(hidden)]
+pub mod __macros {
+    pub use regex::bytes::Regex;
 }
 
 

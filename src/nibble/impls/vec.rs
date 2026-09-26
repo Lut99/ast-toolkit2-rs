@@ -12,7 +12,7 @@ use super::super::{NibbleError, Parsable, Slice};
 
 
 /***** FORMATTERS *****/
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct VecFormatter<F> {
     /// The inner formatter
     fmt: F,

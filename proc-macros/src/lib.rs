@@ -16,6 +16,8 @@ mod derive_located;
 mod derive_node;
 #[cfg(feature = "tree")]
 mod derive_nonterm;
+#[cfg(feature = "nibble")]
+mod derive_parsable;
 #[cfg(feature = "tree")]
 mod derive_term;
 
@@ -25,6 +27,7 @@ use proc_macro::TokenStream;
 
 
 /***** LIBRARY *****/
+// ast_toolkit2::diag
 /// A procedural macro for automatically deriving the `Diagnostic`-trait.
 ///
 /// TODO
@@ -39,6 +42,7 @@ pub fn derive_diagnostic(item: TokenStream) -> TokenStream {
 
 
 
+// ast_toolkit2::loc
 /// A procedural macro for automatically deriving the `Located`-trait.
 ///
 /// By default, this will just return one of the fields of your type when `Located::loc()` is
@@ -189,6 +193,20 @@ pub fn derive_located(item: TokenStream) -> TokenStream {
 
 
 
+// ast_toolkit2::nibble
+/// TODO
+#[cfg(feature = "nibble")]
+#[proc_macro_derive(Parsable, attributes(parse))]
+pub fn derive_parsable(item: TokenStream) -> TokenStream {
+    match derive_parsable::handle(item.into()) {
+        Ok(res) => res.into(),
+        Err(err) => err.into_compile_error().into(),
+    }
+}
+
+
+
+// ast_toolkit2::tree
 /// A procedural macro for automatically deriving the `Node`-trait.
 ///
 /// For now, the `Node`-trait doesn't implement anything, so this macro just generates an empty
