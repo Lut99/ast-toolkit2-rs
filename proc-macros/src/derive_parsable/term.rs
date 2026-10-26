@@ -7,23 +7,15 @@
 
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{ToTokens as _, quote};
-use syn::{DataStruct, Error, Fields, Generics, Ident, LitStr, Visibility};
+use syn::{DataStruct, Error, Fields, Generics, Ident, LitStr};
 
 use super::OuterAttr;
 
 
 /***** LIBRARY *****/
 /// Handles the implementation.
-pub fn handle_impl(
-    outer_attrs: &[OuterAttr],
-    tag: &LitStr,
-    vis: Visibility,
-    ident: Ident,
-    gens: Generics,
-    data: DataStruct,
-) -> Result<TokenStream2, Error> {
+pub fn handle_impl(outer_attrs: &[OuterAttr], tag: &LitStr, ident: Ident, gens: Generics, data: DataStruct) -> Result<TokenStream2, Error> {
     // Prepare stuff
-    let fmt: Ident = Ident::new(&format!("{ident}Formatter"), ident.span());
     let expects: TokenStream2 = outer_attrs
         .into_iter()
         .find_map(|a| match a {
@@ -79,13 +71,13 @@ pub fn handle_impl(
 
     // Generate the impl
     Ok(quote! {
-        #[doc = ::std::concat!("A formatter for the ", ::std::stringify!(#ident), " terminal.")]
-        #[derive(::std::clone::Clone, ::std::marker::Copy, ::std::fmt::Debug, ::std::cmp::Eq, ::std::cmp::PartialEq)]
-        #vis struct #fmt;
-        impl ::std::fmt::Display for #fmt {
-            #[inline]
-            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result { ::std::write!(f, #expects) }
-        }
+        // #[doc = ::std::concat!("A formatter for the ", ::std::stringify!(#ident), " terminal.")]
+        // #[derive(::std::clone::Clone, ::std::marker::Copy, ::std::fmt::Debug, ::std::cmp::Eq, ::std::cmp::PartialEq)]
+        // #vis struct #fmt;
+        // impl ::std::fmt::Display for #fmt {
+        //     #[inline]
+        //     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result { ::std::write!(f, #expects) }
+        // }
 
         impl #impl_gen ::ast_toolkit2::nibble::Parsable<::std::primitive::u8> for #ident #ty_gen #where_bounds {
             type Formatter = &'static ::std::primitive::str;

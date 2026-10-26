@@ -133,40 +133,41 @@ impl<'s, 'r, H: BuildHasher> TextRenderer<'s, 'r, H> {
             pos = i as u64;
         }
 
-        // Then scan the reader for newline boundaries on the RIGHT
-        let mut snippet_end: u64 = range.pos + range.len.fixed();
-        chunk_start = snippet_end;
-        'end: while snippet_end < source_len {
-            // Load the chunk first
-            if let Err(err) = source.seek(SeekFrom::Start(chunk_start)) {
-                return Err(crate::sources::Error::ReaderSeek { name: name.into(), err });
-            }
-            let chunk_end: u64 = chunk_start
-                + match source.read(&mut chunk) {
-                    Ok(len) => len as u64,
-                    Err(err) => {
-                        return Err(crate::sources::Error::ReaderRead { name: name.into(), err });
-                    },
-                };
+        //         // Then scan the reader for newline boundaries on the RIGHT
+        //         let mut snippet_end: u64 = range.pos + range.len.fixed();
+        //         let mut chunk_start = snippet_end;
+        //         'end: while snippet_end < source_len {
+        //             // Load the chunk first
+        //             if let Err(err) = source.seek(SeekFrom::Start(chunk_start)) {
+        //                 return Err(crate::sources::Error::ReaderSeek { name: name.into(), err });
+        //             }
+        //             let chunk_end: u64 = chunk_start
+        //                 + match source.read(&mut chunk) {
+        //                     Ok(len) => len as u64,
+        //                     Err(err) => {
+        //                         return Err(crate::sources::Error::ReaderRead { name: name.into(), err });
+        //                     },
+        //                 };
+        //
+        //             // Search it
+        //             while snippet_end < chunk_end {
+        //                 if chunk[snippet_end as usize] == b'\n' {
+        //                     // We found a newline!
+        //                     break 'end;
+        //                 }
+        //                 if snippet_end >= source_len {
+        //                     break 'end;
+        //                 }
+        //                 snippet_end += 1;
+        //             }
+        //
+        //             // Else, prepare to load the next chunk
+        //             chunk_start = chunk_end;
+        //         }
 
-            // Search it
-            while snippet_end < chunk_end {
-                if chunk[snippet_end as usize] == b'\n' {
-                    // We found a newline!
-                    break 'end;
-                }
-                if snippet_end >= source_len {
-                    break 'end;
-                }
-                snippet_end += 1;
-            }
-
-            // Else, prepare to load the next chunk
-            chunk_start = chunk_end;
-        }
-
-        // The found range should be the text including newlines, now...
-        Ok(Range { pos: snippet_start, len: Length::Fixed(snippet_end - snippet_start) })
+        // // The found range should be the text including newlines, now...
+        // Ok(Range { pos: snippet_start, len: Length::Fixed(snippet_end - snippet_start) })
+        todo!()
     }
 }
 

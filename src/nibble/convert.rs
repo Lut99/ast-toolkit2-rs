@@ -28,11 +28,11 @@ macro_rules! convert_uint_impl {
 
                     // Add to `val` with overflow checks
                     if val > <$ty>::MAX / 10 {
-                        return Err(ParseIntError::Overflow(std::mem::size_of::<$ty>(), slice.into()));
+                        return Err(ParseIntError::Overflow(8 * std::mem::size_of::<$ty>(), slice.into()));
                     }
                     val *= 10;
                     if val > <$ty>::MAX - i {
-                        return Err(ParseIntError::Overflow(std::mem::size_of::<$ty>(), slice.into()));
+                        return Err(ParseIntError::Overflow(8 * std::mem::size_of::<$ty>(), slice.into()));
                     }
                     val += i;
                 }
@@ -75,22 +75,22 @@ macro_rules! convert_sint_impl {
                     // Add to `val` with overflow checks
                     if sign > 0 {
                         if val > <$ty>::MAX / 10 {
-                            return Err(ParseIntError::Overflow(std::mem::size_of::<$ty>(), slice.into()));
+                            return Err(ParseIntError::Overflow(8 * std::mem::size_of::<$ty>(), slice.into()));
                         }
                     } else {
                         if val < <$ty>::MIN / 10 {
-                            return Err(ParseIntError::Underflow(std::mem::size_of::<$ty>(), slice.into()));
+                            return Err(ParseIntError::Underflow(8 * std::mem::size_of::<$ty>(), slice.into()));
                         }
                     }
                     val *= 10;
 
                     if sign > 0 {
                         if val > <$ty>::MAX - i {
-                            return Err(ParseIntError::Overflow(std::mem::size_of::<$ty>(), slice.into()));
+                            return Err(ParseIntError::Overflow(8 * std::mem::size_of::<$ty>(), slice.into()));
                         }
                     } else {
                         if val < <$ty>::MIN - i {
-                            return Err(ParseIntError::Underflow(std::mem::size_of::<$ty>(), slice.into()));
+                            return Err(ParseIntError::Underflow(8 * std::mem::size_of::<$ty>(), slice.into()));
                         }
                     }
                     val += i;

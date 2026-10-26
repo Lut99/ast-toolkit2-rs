@@ -16,7 +16,7 @@
 //
 
 // Modules
-mod convert;
+pub mod convert;
 pub mod error;
 mod impls;
 mod slice;
@@ -41,7 +41,7 @@ pub mod prelude {
 #[cfg(feature = "proc-macros")]
 #[doc(hidden)]
 pub mod __macros {
-    pub use regex::bytes::Regex;
+    pub use regex::bytes::{Match, Regex};
 }
 
 

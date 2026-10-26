@@ -182,13 +182,13 @@ pub fn handle(item: TokenStream2) -> Result<TokenStream2, Error> {
                 _ => None,
             }) {
                 // Handle as a keyword token
-                term::handle_impl(&attrs, tag, vis, ident, generics, s)
+                term::handle_impl(&attrs, tag, ident, generics, s)
             } else if let Some(regex) = attrs.iter().find_map(|a| match a {
                 OuterAttr::Lit { regex } => Some(regex),
                 _ => None,
             }) {
                 // Handle as a keyword token
-                lit::handle_impl(&attrs, regex, vis, ident, generics, s)
+                lit::handle_impl(&attrs, regex, ident, generics, s)
             } else {
                 // Handle as a sequence
                 todo!()
