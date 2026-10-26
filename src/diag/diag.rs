@@ -21,7 +21,7 @@ use super::themes::Theme;
 /// If you enabled `proc-macros`, then likely, you never have interact with this type yourself. Use
 /// the [`Diagnostic`](super::Diagnostic) derive macro instead.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct Diag {
+pub struct Diag<E> {
     /// The style to apply while rendering.
     pub theme: Theme,
 
@@ -33,11 +33,11 @@ pub struct Diag {
     pub msg:  String,
 
     /// The annotations slapped onto this Diagnostic.
-    pub annots: Vec<Annotation>,
+    pub annots: Vec<Annotation<E>>,
 }
 
 // Constructors
-impl Diag {
+impl<E> Diag<E> {
     /// Constructs a new Diag that has the given severity and the given message.
     ///
     /// Note that any other settings, like theme, are set to the default (e.g., [`Theme::PLAIN`]).
@@ -92,11 +92,11 @@ impl Diag {
     /// # Returns
     /// A new Diag as described by the type.
     #[inline]
-    pub fn from_diagnostic<T: Diagnostic>(diag: T) -> Self { diag.into_diag() }
+    pub fn from_diagnostic<T: Diagnostic<E>>(diag: T) -> Self { diag.into_diag() }
 }
 
 // Factory methods
-impl Diag {
+impl<E> Diag<E> {
     /// Consumes this Diag to create an equal one but with the given theme.
     ///
     /// To undo the effects of this function, call it again with the [`Theme::PLAIN`] theme.
@@ -168,16 +168,14 @@ impl Diag {
     /// # Returns
     /// The same Diag but with the given `annot`ation added.
     #[inline]
-    pub fn with_annot(mut self, annot: Annotation) -> Self {
+    pub fn with_annot(mut self, annot: Annotation<E>) -> Self {
         self.annots.push(annot);
         self
     }
 }
 
-// Rendering
-
 // Uniformity
-impl Diagnostic for Diag {
+impl<E> Diagnostic<E> for Diag<E> {
     #[inline]
-    fn into_diag(self) -> Diag { self }
+    fn into_diag(self) -> Diag<E> { self }
 }

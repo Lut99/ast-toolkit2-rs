@@ -39,9 +39,9 @@ pub enum Severity {
 /***** LIBRARY *****/
 /// Defines annotations that can be given in a snippet.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct Annotation {
+pub struct Annotation<E> {
     /// Defines any visual suggested replacement for the underlying `S`ource text.
-    pub repl: Option<String>,
+    pub repl: Option<Vec<E>>,
     /// Defines any message to give with this annotation.
     pub msg:  Option<String>,
     /// The severity (= color and markers like "error" or "help") of this annotation.
@@ -51,7 +51,7 @@ pub struct Annotation {
 }
 
 // Constructors
-impl Annotation {
+impl<E> Annotation<E> {
     /// Creates a new annotation.
     ///
     /// # Arguments
@@ -124,7 +124,7 @@ impl Annotation {
 }
 
 // Loc
-impl Located for Annotation {
+impl<E> Located for Annotation<E> {
     #[inline]
     fn loc(&self) -> Loc { self.loc }
 }

@@ -47,7 +47,7 @@ fn test_derive_diagnostic_structs() {
     #[diag(error, msg = "Some error occurred!", loc)]
     #[annot(error, msg = "...because of this error", loc = reason1)]
     #[annot(error, msg = "...and this error", loc = reason2)]
-    #[annot(error, msg = "Try doing this instead!", repl = "foo", loc = reason3)]
+    #[annot(error, msg = "Try doing this instead!", repl<u8> = "foo".as_bytes(), loc = reason3)]
     struct ManyAnnotsWithRepl {
         loc:     Loc,
         reason1: Loc,
@@ -58,7 +58,7 @@ fn test_derive_diagnostic_structs() {
     // Complex formatting
     #[derive(Diagnostic)]
     #[diag(error, code = ("E{}", code), msg = ("Hello, {}", world))]
-    #[annot(warning, repl = ("{foo}"), msg = ("Goodbye, {:?}", world), loc)]
+    #[annot(warning, repl<u8> = foo.as_bytes(), msg = ("Goodbye, {:?}", world), loc)]
     struct ComplexFormat {
         code:  u32,
         world: &'static str,
@@ -69,26 +69,26 @@ fn test_derive_diagnostic_structs() {
     // Tuple formatting
     #[derive(Diagnostic)]
     #[diag(error, code = ("E{f0}"), msg = ("Hello, {f1}"))]
-    #[annot(warning, repl = ("{f2}"), msg = ("Goodbye, {f1:?}"), loc = f3)]
+    #[annot(warning, repl<u8> = f2.as_bytes(), msg = ("Goodbye, {f1:?}"), loc = f3)]
     struct TupleFormat(u32, &'static str, &'static str, Loc);
 
 
     const ID: u64 = 0;
-    assert_eq!(SimpleSyntaxSugar { loc: Loc::encapsulate(ID) }.into_diag(), Diag {
+    assert_eq!(SimpleSyntaxSugar { loc: Loc::encapsulate(ID) }.into_diag(), Diag::<u8> {
         theme:  Theme::PLAIN,
         sev:    Severity::Error,
         code:   None,
         msg:    "SimpleSyntaxSugar is not doing so well...".into(),
         annots: vec![Annotation { repl: None, msg: None, sev: Severity::Error, loc: Loc::encapsulate(ID) }],
     });
-    assert_eq!(SimpleVerbose { loc: Loc::encapsulate(ID) }.into_diag(), Diag {
+    assert_eq!(SimpleVerbose { loc: Loc::encapsulate(ID) }.into_diag(), Diag::<u8> {
         theme:  Theme::PLAIN,
         sev:    Severity::Error,
         code:   None,
         msg:    "SimpleVerbose is not doing so well...".into(),
         annots: vec![Annotation { repl: None, msg: None, sev: Severity::Error, loc: Loc::encapsulate(ID) }],
     });
-    assert_eq!(ExtraAnnot { loc: Loc::encapsulate_range(ID, ..3), reason: Loc::encapsulate_range(ID, 3..) }.into_diag(), Diag {
+    assert_eq!(ExtraAnnot { loc: Loc::encapsulate_range(ID, ..3), reason: Loc::encapsulate_range(ID, 3..) }.into_diag(), Diag::<u8> {
         theme:  Theme::PLAIN,
         sev:    Severity::Help,
         code:   None,
@@ -100,7 +100,7 @@ fn test_derive_diagnostic_structs() {
             loc:  Loc::encapsulate_range(ID, 3..),
         }],
     });
-    assert_eq!(WithCode { loc: Loc::encapsulate(ID) }.into_diag(), Diag {
+    assert_eq!(WithCode { loc: Loc::encapsulate(ID) }.into_diag(), Diag::<u8> {
         theme:  Theme::PLAIN,
         sev:    Severity::Warning,
         code:   Some("W001".into()),
@@ -192,36 +192,36 @@ fn test_derive_diagnostic_enums() {
         #[diag(error, msg = "Some error occurred!", loc)]
         #[annot(error, msg = "...because of this error", loc = reason1)]
         #[annot(error, msg = "...and this error", loc = reason2)]
-        #[annot(error, msg = "Try doing this instead!", repl = "foo", loc = reason3)]
+        #[annot(error, msg = "Try doing this instead!", repl<u8> = "foo", loc = reason3)]
         ManyAnnotsWithRepl { loc: Loc, reason1: Loc, reason2: Loc, reason3: Loc },
 
         // Complex formatting
         #[diag(error, code = ("E{}", code), msg = ("Hello, {}", world))]
-        #[annot(warning, repl = ("{foo}"), msg = ("Goodbye, {:?}", world), loc)]
+        #[annot(warning, repl<u8> = foo, msg = ("Goodbye, {:?}", world), loc)]
         ComplexFormat { code: u32, world: &'static str, foo: &'static str, loc: Loc },
 
         #[diag(error, code = ("E{f0}"), msg = ("Hello, {f1}"))]
-        #[annot(warning, repl = ("{f2}"), msg = ("Goodbye, {f1:?}"), loc = f3)]
+        #[annot(warning, repl<u8> = f2, msg = ("Goodbye, {f1:?}"), loc = f3)]
         TupleFormat(u32, &'static str, &'static str, Loc),
     }
 
 
     const ID: u64 = 0;
-    assert_eq!(Test::SimpleSyntaxSugar { loc: Loc::encapsulate(ID) }.into_diag(), Diag {
+    assert_eq!(Test::SimpleSyntaxSugar { loc: Loc::encapsulate(ID) }.into_diag(), Diag::<u8> {
         theme:  Theme::PLAIN,
         sev:    Severity::Error,
         code:   None,
         msg:    "SimpleSyntaxSugar is not doing so well...".into(),
         annots: vec![Annotation { repl: None, msg: None, sev: Severity::Error, loc: Loc::encapsulate(ID) }],
     });
-    assert_eq!(Test::SimpleVerbose { loc: Loc::encapsulate(ID) }.into_diag(), Diag {
+    assert_eq!(Test::SimpleVerbose { loc: Loc::encapsulate(ID) }.into_diag(), Diag::<u8> {
         theme:  Theme::PLAIN,
         sev:    Severity::Error,
         code:   None,
         msg:    "SimpleVerbose is not doing so well...".into(),
         annots: vec![Annotation { repl: None, msg: None, sev: Severity::Error, loc: Loc::encapsulate(ID) }],
     });
-    assert_eq!(Test::ExtraAnnot { loc: Loc::encapsulate_range(ID, ..3), reason: Loc::encapsulate_range(ID, 3..) }.into_diag(), Diag {
+    assert_eq!(Test::ExtraAnnot { loc: Loc::encapsulate_range(ID, ..3), reason: Loc::encapsulate_range(ID, 3..) }.into_diag(), Diag::<u8> {
         theme:  Theme::PLAIN,
         sev:    Severity::Help,
         code:   None,
@@ -233,7 +233,7 @@ fn test_derive_diagnostic_enums() {
             loc:  Loc::encapsulate_range(ID, 3..),
         }],
     });
-    assert_eq!(Test::WithCode { loc: Loc::encapsulate(ID) }.into_diag(), Diag {
+    assert_eq!(Test::WithCode { loc: Loc::encapsulate(ID) }.into_diag(), Diag::<u8> {
         theme:  Theme::PLAIN,
         sev:    Severity::Warning,
         code:   Some("W001".into()),

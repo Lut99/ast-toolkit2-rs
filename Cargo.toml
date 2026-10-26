@@ -31,8 +31,11 @@ required-features = ["loc", "proc-macros", "tree"]
 
 [dependencies]
 console = { version = "0.16.0", default-features = false, features = ["std"], optional = true }
+hashbrown = { version = "0.17.0", default-features = false, optional = true }
+polonius-the-crab = { version = "0.5.0", default-features = false, optional = true }
 regex = { version = "1.13.0", default-features = false, optional = true }
 serde = { version = "1.0.0", default-features = false, features = ["derive"], optional = true }
+unicode-segmentation = { version = "1.13.0", default-features = false, optional = true }
 
 ast-toolkit2-decl-macros = { path = "./decl-macros", optional = true }
 ast-toolkit2-proc-macros = { path = "./proc-macros", optional = true }
@@ -50,12 +53,13 @@ diagnostic = ["diag"]
 parse = ["nibble"]
 
 # Functionality
-diag = ["loc", "ast-toolkit2-proc-macros/diag"]
+diag = ["loc", "ast-toolkit2-proc-macros/diag", "dep:unicode-segmentation"]
 init = []
 loc = ["ast-toolkit2-proc-macros/loc"]
 nibble = ["dep:regex", "ast-toolkit2-proc-macros/nibble", "loc"]
 print = ["ast-toolkit2-decl-macros/print"]
 punct = ["ast-toolkit2-decl-macros/punct"]
+sources = ["loc", "dep:hashbrown", "dep:polonius-the-crab"]
 tree = ["loc", "ast-toolkit2-proc-macros/tree"]
 
 # Third-party

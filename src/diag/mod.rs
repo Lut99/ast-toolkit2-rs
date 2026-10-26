@@ -11,7 +11,7 @@
 // Declare the nested modules
 mod annots;
 mod diag;
-// mod layout;
+pub mod layout;
 mod themes;
 
 // Use 'em
@@ -19,6 +19,7 @@ pub use annots::{Annotation, Severity};
 #[cfg(feature = "proc-macros")]
 pub use ast_toolkit2_proc_macros::Diagnostic;
 pub use diag::Diag;
+pub use layout::{RenderedDiag, Renderer};
 pub use themes::Theme;
 
 
@@ -30,7 +31,7 @@ pub use themes::Theme;
 ///
 /// Luckily you won't have to write it yourself. Simply enable the `proc-macros`-feature and use
 /// the derive trait!
-pub trait Diagnostic {
+pub trait Diagnostic<E> {
     /// Returns a fresh [`Diag`] from this Diagnostic.
     ///
     /// The [`Diag`] is eventually what is being rendered to the user, with all its information and
@@ -42,5 +43,5 @@ pub trait Diagnostic {
     /// # Returns
     /// A fresh [`Diag`] that represents the diagnostic information of this type condensed down to
     /// something we can render.
-    fn into_diag(self) -> Diag;
+    fn into_diag(self) -> Diag<E>;
 }

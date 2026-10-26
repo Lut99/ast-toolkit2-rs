@@ -17,8 +17,8 @@
 //!
 //!      RESULT: We stop caring about unique sources.
 //!
-//!      RESULT: All [`Span`](ast_toolkit_span::Span)s in annotations are
-//!      replaced with their `Range`s only.
+//!      RESULT: All [`Loc`](ast_toolkit2::Loc)s in annotations are replaced
+//!      with their `Range`s only.
 //!   2. _Splitting overlapping replaces:_
 //!
 //!      In the second step, we examine any annotation with a `replace` whether
@@ -31,34 +31,34 @@
 //!
 //!      RESULT: No more annotations appear in the list that have a replace and
 //!      overlap with another one in the list.
-//!   3. _Applying replaces:_
+//!   3. _Organizing annotations:_
+//!      
+//!      In the third step, we collect all annotations and put them in a
+//!      sequential datastructure, the [`View`](s3_build_view::View). This will
+//!      be an abstract overview of the source text that marks areas to be
+//!      highlighted source text, unhighlighted source text or replaced source
+//!      text.
 //!
-//!      In the third step, we will apply the replaces by turning the main
-//!      group span into a _virtual span_. This one consists of slices of the
-//!      main span alternated with replaced values, allowing one to iterate
-//!      over it as if it was one span. At the same time, it will update all
-//!      annotation ranges with the ones in the virtual span, yielding _virtual
-//!      ranges_.
-//!
-//!      RESULT: We stop caring about replaces.
-//!
-//!      RESULT: The main [`Span`](ast_toolkit_span::Span) becomes a
-//!      `VirtualSpan`, and all `Range`s in annotations become `VirtualRange`s.
-//!      No annotation will have a `replacement` anymore.
+//!      RESULT: We stop thinking about annotations as loose items and instead
+//!      start building a coherent snippet.
+//!      
+//!      RESULT: Replacements are removed from annotations and instead treated
+//!      as text that needs to be loaded differently.
 //!   4. _Layouters:_
 //!
-//!      In the fourth step, we apply a user-selected
-//!      [`Layouter`] that, with a maximum line width in mind, will render the
-//!      virtual span into a cellbuffer. It, albeit with help from the virtual
-//!      span, is responsible for annotating the resulting cellbuffer with
-//!      flags indicating when annotations start and stop.
+//!      In the fourth step, we apply [`Renderer::layout()`] to turn the
+//!      abstract view into something concrete and visual, depending on the
+//!      layouter's preference. This concrete and visual is stored in a
+//!      [`Layout`](s4_layout::Layout) that no longer does ranges pointing in
+//!      the source text, but rather embeds information about when to start-
+//!      and stop annotations in the buffer itself.
 //!
 //!      RESULT: We unlock any visual information we need to place annotations.
 //!
 //!      RESULT: We stop caring about ranges, as the flags will signpost where
 //!      to apply them instead.
 //!
-//!      RESULT: We obtain a populated [`CellBuffer`] that carries the visual
+//!      RESULT: We obtain a populated buffer that carries the visual
 //!      representation of the source text as well as annotations in flag form.
 //!   5. _Placing:_
 //!
@@ -86,14 +86,115 @@
 //!   monotinic: they only depent on previous steps.
 //
 
-// Declare the modules
+// Modules
 mod s1_grouping;
 mod s2_split_replace;
-mod s3_apply_replace;
-mod s4_layouters;
-mod s5_placing;
-mod s6_rendering;
+mod s3_build_view;
+mod s4_layout;
+// mod s5_placing;
+// mod s6_rendering;
+#[cfg(feature = "sources")]
+pub mod renderers;
 
-// Define public interfaces
-pub use s3_apply_replace::VirtualSpan;
-pub use s4_layouters::{AnnotFlag, Cell, CellBuffer, HexLayouter, Layouter, Line, Utf8Layouter};
+// Imports
+use std::collections::HashMap;
+use std::error::Error;
+use std::fmt::{Display, Formatter, Result as FResult};
+
+pub use s3_build_view::View;
+pub use s4_layout::Layout;
+
+use super::diag::Diag;
+
+
+/***** AUXILLARY *****/
+/// The [`RenderedDiag`]-struct that carries the result of rendering a [`Diag`].
+///
+/// You rarely have to use this struct yourself; instead, call [`Renderer::render()`] on a renderer
+/// to do it for you.
+pub struct RenderedDiag;
+
+// Ops
+impl Display for RenderedDiag {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter<'_>) -> FResult { todo!() }
+}
+
+
+
+
+
+/***** LIBRARY *****/
+/// Defines something that can render [`Diag`]s.
+pub trait Renderer<E: Clone> {
+    /// Types of errors emitted by this renderer.
+    type Error: Error;
+
+
+    /* User-implemented stuff */
+    /// Defines how to map [`Loc`] source IDs to some human-friendly name the user understands.
+    ///
+    /// For example, this could be backed by a map of IDs to filenames.
+    ///
+    /// # Arguments
+    /// - `id`: The ID to map.
+    ///
+    /// # Returns
+    /// A name for the source with the given `id`.
+    ///
+    /// # Panics
+    /// This function should panic if the `id` was not recognized by it.
+    fn display_id(&self, id: u64) -> impl Display;
+
+    /// Defines how to render a sequence of `E`lements.
+    ///
+    /// # Arguments
+    /// - `seq`: The sequence of elements to render.
+    ///
+    /// # Returns
+    /// Something implementing [`Display`] that will render the given sequence.
+    fn display_seq(&self, seq: &[E]) -> impl Display;
+
+    /// Layouting algorithm that does two things:
+    /// 1. Load the appropriate parts of the source text; and
+    /// 2. Renders a [`View`] into a [`Layout`] by making abstract areas concrete and renderable.
+    ///
+    /// # Arguments
+    /// - `id`: The ID of the source to render.
+    /// - `view`: The [`View`] who's annotation markings and range to render.
+    ///
+    /// # Returns
+    /// A new [`Layout`] that has most abstractions removed and has the laid-out text with inline
+    /// flags for where to annotate.
+    ///
+    /// # Errors
+    /// Since this function potentially loads source text, we can expect it to fail with its own
+    /// error.
+    ///
+    /// # Panics
+    /// This function should panic if the `id` was not recognized by it.
+    fn layout<'a>(&mut self, id: u64, view: View<'a, E>) -> Result<Layout<'a>, Self::Error>;
+
+
+    /* Auto-implemented stuff */
+    /// Renders a given [`Diag`] into a [`RenderedDiag`].
+    ///
+    /// That one implements [`Display`] to show the result.
+    ///
+    /// # Returns
+    /// A [`RenderedDiag`] that implements [`Display`](std::fmt::Display).
+    fn render(&mut self, diag: &Diag<E>) -> Result<RenderedDiag, Self::Error> {
+        // (S1) Begin by grouping annotations
+        let groups: HashMap<Option<u64>, Vec<s1_grouping::Annot<E>>> = s1_grouping::group_annots(&diag.annots);
+        for (id, mut group) in groups.into_iter() {
+            // (S2) Ensure that any replace that overlaps with another annotation is reframed as a message
+            s2_split_replace::split_replace_annots(self, &mut group);
+            // (S3) Turn that ~~frown upside down~~ I mean group into a view
+            let view: View<E> = s3_build_view::build_view(group);
+            // (S4) Render the abstract view to a layout
+            let layout: Option<Layout> = id.map(|id| s4_layout::layout(self, id, view)).transpose()?;
+        }
+
+        todo!()
+    }
+}

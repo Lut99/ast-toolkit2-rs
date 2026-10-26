@@ -18,6 +18,8 @@ pub mod nibble;
 pub mod print;
 #[cfg(feature = "punct")]
 pub mod punct;
+#[cfg(feature = "sources")]
+pub mod sources;
 #[cfg(feature = "tree")]
 pub mod tree;
 
@@ -41,8 +43,8 @@ pub mod prelude {
 /// Represents re-exports of macros.
 #[cfg(feature = "macros")]
 pub mod macros {
-    #[cfg(all(feature = "proc-macros", feature = "loc"))]
-    pub use ast_toolkit2_proc_macros::Located;
-    #[cfg(all(feature = "proc-macros", feature = "tree"))]
-    pub use ast_toolkit2_proc_macros::{Node, NonTerm, Term};
+    #[cfg(feature = "decl-macros")]
+    pub use ast_toolkit2_decl_macros::*;
+    #[cfg(feature = "proc-macros")]
+    pub use ast_toolkit2_proc_macros::*;
 }

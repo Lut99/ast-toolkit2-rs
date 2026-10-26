@@ -150,6 +150,69 @@ pub enum Length {
     Indefinite,
 }
 
+// Length
+impl Length {
+    /// Assumes that this Length is [`Length::Fixed`].
+    ///
+    /// # Returns
+    /// The fixed length.
+    ///
+    /// # Panics
+    /// This function panics if we are [`Length::Indefinite`] instead.
+    #[inline]
+    #[track_caller]
+    pub const fn fixed(self) -> u64 {
+        match self {
+            Self::Fixed(len) => len,
+            Self::Indefinite => panic!("Cannot unwrap Length::Indefinite as Length::Fixed"),
+        }
+    }
+
+    /// Unsafe equivalent of [`Length::fixed()`] that does not check the variant but rather assumes
+    /// it.
+    ///
+    /// # Safety
+    /// To call this function, you must ensure that this is indeed a [`Length::Fixed`]. Else,
+    /// undefined behaviour WILL occur!
+    ///
+    /// # Returns
+    /// The fixed length.
+    #[inline]
+    #[cfg_attr(debug_assertions, track_caller)]
+    pub const unsafe fn assume_fixed(self) -> u64 {
+        match self {
+            Self::Fixed(len) => len,
+            Self::Indefinite => {
+                #[cfg(debug_assertions)]
+                panic!(
+                    "IMPORTANT: You've violated an unsafe invariant! Please make sure that this is `Length::Fixed` (spoiler: it is not).\n\n(This \
+                     check is left when `debug_assertions` is given, it will be removed in optimized builds. Only then will you *actually* trigger \
+                     undefined behaviour.)"
+                );
+                #[cfg(not(debug_assertions))]
+                unsafe {
+                    std::hint::unreachable_unchecked()
+                };
+            },
+        }
+    }
+
+    /// Assumes that this Length is [`Length::Indefinite`].
+    ///
+    /// Since it does not carry a value, you can think of this method as asserting that it is so.
+    ///
+    /// # Panics
+    /// This function panics if we are [`Length::Fixed`] instead.
+    #[inline]
+    #[track_caller]
+    pub const fn indefinite(self) -> () {
+        match self {
+            Self::Indefinite => (),
+            Self::Fixed(_) => panic!("Cannot unwrap Length::Fixed as Length::Indefinite"),
+        }
+    }
+}
+
 // Conversion
 impl<T: Index> From<T> for Length {
     #[inline]
@@ -398,6 +461,30 @@ impl PartialEq<()> for Range {
 
 // Range
 impl Range {
+    /// Contextualizes this Range in a fixed-length space.
+    ///
+    /// Practically, this does the following:
+    /// - Caps the length s.t. the range doesn't exceed the `max_len` if it's finite; and
+    /// - Makes the length finite s.t. the range extends to `max_len`.
+    ///
+    /// # Arguments
+    /// - `max_len`: The maximium length to contextualize to. Probably, this is the length of your
+    ///   array.
+    ///
+    /// # Returns
+    /// A new Range that is the same but with a capped length.
+    #[inline]
+    pub const fn contextualize(self, max_len: u64) -> Self {
+        let Self { pos, len } = self;
+        match len {
+            Length::Fixed(len) if pos <= max_len => Self { pos, len: Length::Fixed(min(len, max_len - pos)) },
+            Length::Indefinite if pos <= max_len => Self { pos, len: Length::Fixed(max_len - pos) },
+            Length::Fixed(_) | Length::Indefinite => Self { pos: max_len, len: Length::Fixed(0) },
+        }
+    }
+
+
+
     /// Returns a new Range which is a subset of this one.
     ///
     /// The subset is expressed as another Range.
@@ -556,6 +643,58 @@ impl Range {
 
 
 
+    /// Returns whether this and the given Range overlap.
+    ///
+    /// # Arguments
+    /// - `other`: The other Range to check if we overlap with it.
+    ///
+    /// # Returns
+    /// True if they overlap, or false otherwise.
+    #[inline]
+    pub const fn overlaps_with(self, other: Range) -> bool {
+        match (self.len, other.len) {
+            /* Fixed-range cases */
+            // If they are both empty, then they are two points; they only overlap if they really
+            // are on the same position
+            (Length::Fixed(0), Length::Fixed(0)) => self.pos == other.pos,
+            // It can also be only one of them is empty. Then the position simply has to lie within the range
+            // SAFETY: The `- 1` is OK here, because above the case is caught where `rhs == 0`
+            (Length::Fixed(0), Length::Fixed(rhs)) => self.pos >= other.pos && self.pos < other.pos + rhs,
+            // SAFETY: The `- 1` is OK here, because above the case is caught where `lhs == 0`
+            (Length::Fixed(lhs), Length::Fixed(0)) => other.pos >= self.pos && other.pos < self.pos + lhs,
+            // https://stackoverflow.com/a/3269471
+            // SAFETY: The `- 1`'s are OK here, because any case where either is 0 is caught above
+            (Length::Fixed(lhs), Length::Fixed(rhs)) => self.pos < other.pos + rhs && other.pos < self.pos + lhs,
+
+            /* Open-ended cases */
+            (Length::Fixed(0), Length::Indefinite) => self.pos == other.pos,
+            (Length::Fixed(lhs), Length::Indefinite) => other.pos < self.pos + lhs,
+            (Length::Indefinite, Length::Fixed(0)) => self.pos == other.pos,
+            (Length::Indefinite, Length::Fixed(rhs)) => self.pos < other.pos + rhs,
+            (Length::Indefinite, Length::Indefinite) => true,
+        }
+    }
+
+    /// Returns whether this range fully eclipses another.
+    ///
+    /// # Arguments
+    /// - `other`: The other Range to check if it fits entirely within this one.
+    ///
+    /// # Returns
+    /// True if we are strictly overarching `other`, or false otherwise.
+    #[inline]
+    pub const fn overarches(self, other: Range) -> bool {
+        match (self.len, other.len) {
+            /* Fixed-range cases */
+            (Length::Fixed(lhs), Length::Fixed(rhs)) => self.pos <= other.pos && lhs >= rhs + (other.pos - self.pos),
+            /* Open-ended cases */
+            (Length::Fixed(_), Length::Indefinite) => false, // We will never fit it :(
+            (Length::Indefinite, _) => self.pos <= other.pos,
+        }
+    }
+
+
+
     /// Returns the starting position of this Range.
     ///
     /// Simply equal to [`Range::pos`].
@@ -564,7 +703,7 @@ impl Range {
     /// The zero-indexed index of the leftmost element part of the range (i.e., inclusive start
     /// index).
     #[inline]
-    pub const fn start(&self) -> u64 { self.pos }
+    pub const fn start(self) -> u64 { self.pos }
 
     /// Returns the ending position of this Range.
     ///
@@ -575,7 +714,7 @@ impl Range {
     /// The zero-indexed index of the first element after the range _not_ part of it (i.e.,
     /// exclusive end index), or [`None`] if [`Range::len`] is [`Length::Indefinite`].
     #[inline]
-    pub const fn end(&self) -> Option<u64> {
+    pub const fn end(self) -> Option<u64> {
         match self.len {
             Length::Fixed(len) => Some(self.pos.saturating_add(len)),
             Length::Indefinite => None,
@@ -596,7 +735,7 @@ impl Range {
     /// The zero-indexed index of the first element after the range _not_ part of it (i.e.,
     /// exclusive end index).
     #[inline]
-    pub const fn end_in(&self, max_len: u64) -> u64 {
+    pub const fn end_in(self, max_len: u64) -> u64 {
         match self.len {
             Length::Fixed(len) => min(self.pos.saturating_add(len), max_len),
             Length::Indefinite => max_len,
@@ -605,6 +744,19 @@ impl Range {
 }
 
 // Conversion
+impl FromIterator<Range> for Range {
+    /// Iterates over this type to create one [Range] [`Range::extend()`]ed over all of the elements.
+    ///
+    /// If there are none, then [`Range::empty()`] is returned.
+    #[inline]
+    fn from_iter<T: IntoIterator<Item = Range>>(iter: T) -> Self {
+        let mut res: Option<Range> = None;
+        for range in iter {
+            res.get_or_insert(range).extend(range);
+        }
+        res.unwrap_or_else(Range::empty)
+    }
+}
 impl<T: Index> From<ops::Range<T>> for Range {
     #[inline]
     #[track_caller]
@@ -662,7 +814,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_slice() {
+    fn test_range_slice() {
         // Some testcases; extend when more are known!
         assert_eq!(Range::from(0..10).slice_range(0..5), 0..5);
         assert_eq!(Range::from(..10).slice_range(0..5), 0..5);
@@ -685,5 +837,36 @@ mod tests {
         assert_eq!(Range::from(1..4).slice_range(..2), 1..3);
 
         assert_eq!(Range::from(2..).slice_range(..1), 2..3);
+    }
+
+    #[test]
+    fn test_range_overlaps_with() {
+        assert!(!Range::from(0..2).overlaps_with(Range::from(3..5)));
+        assert!(!Range::from(0..2).overlaps_with(Range::from(2..4)));
+        assert!(Range::from(1..3).overlaps_with(Range::from(2..4)));
+        assert!(Range::from(2..4).overlaps_with(Range::from(2..4)));
+        assert!(Range::from(2..4).overlaps_with(Range::from(1..3)));
+        assert!(!Range::from(3..5).overlaps_with(Range::from(1..3)));
+        assert!(Range::from(0..6).overlaps_with(Range::from(2..4)));
+        assert!(Range::from(2..4).overlaps_with(Range::from(0..6)));
+        assert!(Range::from(2..4).overlaps_with(Range::from(..)));
+        assert!(!Range::from(2..4).overlaps_with(Range::from(())));
+        assert!(Range::from(2..4).overlaps_with(Range::from(2..2)));
+    }
+
+    #[test]
+    fn test_range_overarches() {
+        assert!(!Range::from(0..2).overarches(Range::from(3..5)));
+        assert!(!Range::from(0..2).overarches(Range::from(2..4)));
+        assert!(!Range::from(1..3).overarches(Range::from(2..4)));
+        assert!(Range::from(2..4).overarches(Range::from(2..4)));
+        assert!(!Range::from(2..4).overarches(Range::from(1..3)));
+        assert!(!Range::from(3..5).overarches(Range::from(1..3)));
+        assert!(Range::from(0..6).overarches(Range::from(2..4)));
+        assert!(!Range::from(2..4).overarches(Range::from(0..6)));
+        assert!(!Range::from(2..4).overarches(Range::from(..)));
+        assert!(Range::from(..).overarches(Range::from(2..4)));
+        assert!(!Range::from(2..4).overarches(Range::from(())));
+        assert!(Range::from(2..4).overarches(Range::from(2..2)));
     }
 }

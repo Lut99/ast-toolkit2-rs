@@ -13,6 +13,42 @@ use super::{NibbleError, Parsable};
 use crate::loc::{Length, Loc, Located};
 
 
+/***** FOREIGN IMPLS *****/
+#[cfg(feature = "sources")]
+impl<'r, H: std::hash::BuildHasher> crate::sources::Sources<'r, H> {
+    /// Returns a reference to a slice of a source text in a Sources, as a [`Slice`].
+    ///
+    /// See [`Sources::load()`](crate::sources::Sources::load()) for more information.
+    ///
+    /// # Arguments
+    /// - `id`: The ID of the source text to load.
+    /// - `range`: Some [`Range`] to load from a source text. Use [`Range::full()`] if you want to
+    ///   load everything.
+    ///
+    /// # Returns
+    /// A reference to the loaded source snippet as a [`Slice`].
+    ///
+    /// # Errors
+    /// This function may error if we needed to load from a reader and the reader failed.
+    ///
+    /// # Panics
+    /// This function panics if it didn't know the given `id`. Use
+    /// [`Sources::contains_id()`](crate::sources::Sources::contains_id()) to manually check if
+    /// beforehand if you need to.
+    #[inline]
+    pub fn load_slice<'s>(&'s mut self, id: u64, range: impl Into<crate::loc::Range>) -> Result<Slice<'s, u8>, crate::sources::Error> {
+        // Load the slice
+        let text: &'s [u8] = self.load(id, range)?;
+
+        // Wrap it in a slice
+        Ok(Slice::with_raw_id(id, text))
+    }
+}
+
+
+
+
+
 /***** LIBRARY *****/
 /// The main input type to the nibble parser, which wraps around slices.
 ///

@@ -13,12 +13,32 @@ use syn::spanned::Spanned;
 use syn::token::Paren;
 use syn::visit_mut::VisitMut;
 use syn::{
-    Attribute, Data, DataUnion, DeriveInput, Error, Expr, ExprLit, ExprPath, Fields, Ident, Lit, LitStr, Meta, Path, PathSegment, Token,
-    parenthesized,
+    Attribute, Data, DataUnion, DeriveInput, Error, Expr, ExprLit, ExprPath, Fields, Ident, Lit, LitStr, Meta, Path, PathSegment, Token, Type,
+    TypePath, parenthesized,
 };
+
+use crate::common::split_for_impl_with_extra;
 
 
 /***** HELPER FUNCTIONS *****/
+/// Generates the default element type path.
+#[inline]
+fn default_elemty() -> Type {
+    Type::Path(TypePath {
+        qself: None,
+        path:  Path {
+            leading_colon: None,
+            segments:      {
+                let mut segs = Punctuated::new();
+                segs.push(PathSegment { ident: Ident::new("__E", Span::mixed_site()), arguments: syn::PathArguments::None });
+                segs
+            },
+        },
+    })
+}
+
+
+
 /// Generates the field expansion (i.e., `{...}` in `let Self { ... } = self`) of a set of [`Fields`].
 ///
 /// The boolean indicates whether the fields have names (i.e., struct syntax) or are implicit
@@ -168,10 +188,9 @@ enum DiagAttr {
     /// Defines an annotation expression
     Loc(Expr, Span),
 }
-impl Parse for DiagAttr {
-    #[inline]
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let ident: Ident = input.parse()?;
+impl DiagAttr {
+    /// Does the parsing but without the check for toplevelattr
+    fn parse_ident(ident: &Ident, input: ParseStream) -> syn::Result<Self> {
         if ident == "error" {
             Ok(Self::Severity(Severity::Error, ident.span()))
         } else if ident == "help" {
@@ -196,6 +215,14 @@ impl Parse for DiagAttr {
         }
     }
 }
+impl Parse for DiagAttr {
+    #[inline]
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        // Ignore anything that's a toplevelattr
+        let ident: Ident = input.parse()?;
+        Self::parse_ident(&ident, input)
+    }
+}
 
 /// Defines possible `#[annot(...)]`-attributes.
 enum AnnotAttr {
@@ -204,7 +231,7 @@ enum AnnotAttr {
     /// Defines a message
     Message(Punctuated<Expr, Token![,]>, Span),
     /// Defines a replacement
-    Replace(Punctuated<Expr, Token![,]>, Span),
+    Replace(Type, Expr, Span),
     /// Defines an annotation expression
     Loc(Expr, Span),
 }
@@ -222,8 +249,11 @@ impl Parse for AnnotAttr {
             Ok(Self::Severity(Severity::Warning, ident.span()))
         } else if ident == "repl" || ident == "replace" {
             // Then do the equals-value thingy
+            input.parse::<Token![<]>()?;
+            let ty: Type = input.parse()?;
+            input.parse::<Token![>]>()?;
             input.parse::<Token![=]>()?;
-            Ok(Self::Replace(parse_fmt_exprs(input)?, ident.span()))
+            Ok(Self::Replace(ty, input.parse::<Expr>()?, ident.span()))
         } else if ident == "msg" || ident == "message" {
             // Then do the equals-value thingy
             input.parse::<Token![=]>()?;
@@ -246,13 +276,16 @@ struct Annot {
     /// The message (if any)
     msg:  Option<Punctuated<Expr, Token![,]>>,
     /// The replacement (if any)
-    repl: Option<Punctuated<Expr, Token![,]>>,
+    repl: Option<(Type, Expr)>,
     /// The location expression
     loc:  Expr,
 }
 
 /// Defines what we expect to learn from toplevel (struct) or variant (enum) attributes.
 struct Diag {
+    /// The type of element to use.
+    elemty: Option<Type>,
+
     /// The main severity
     sev:    Severity,
     /// The main message
@@ -264,20 +297,24 @@ struct Diag {
 }
 impl Diag {
     /// Generates a list tokens representing the constructions of each annotation.
-    fn generate_annots(&self) -> Vec<TokenStream2> {
+    fn generate_annots(&self, diag_gen: &Type) -> Vec<TokenStream2> {
         self.annots
             .iter()
             .map(|a| {
                 let asev: Severity = a.sev;
                 let amsg: TokenStream2 = render_fstr_as_string(&a.msg);
-                let arepl: TokenStream2 = render_fstr_as_string(&a.repl);
+                let arepl: TokenStream2 = a
+                    .repl
+                    .as_ref()
+                    .map(|(_, e)| quote! { ::std::option::Option::Some(::std::convert::Into::<::std::vec::Vec<#diag_gen>>::into(#e)) })
+                    .unwrap_or_else(|| quote! { ::std::option::Option::None });
                 let aloc: &Expr = &a.loc;
                 quote! {
-                    ::ast_toolkit2::diag::Annotation {
+                    ::ast_toolkit2::diag::Annotation::<#diag_gen> {
                         repl: #arepl,
                         msg: #amsg,
                         sev: #asev,
-                        loc: #aloc,
+                        loc: ::ast_toolkit2::loc::Located::loc(&#aloc),
                     }
                 }
             })
@@ -286,6 +323,7 @@ impl Diag {
 
     /// Parses the VariantAttrs from a given list of attributes.
     fn parse_from_attrs(topspan: Span, attrs: &[Attribute]) -> Result<Self, Error> {
+        let mut elemty: Option<Type> = None;
         let mut sev: Option<Severity> = None;
         let mut code: Option<Punctuated<Expr, Token![,]>> = None;
         let mut msg: Option<Punctuated<Expr, Token![,]>> = None;
@@ -337,7 +375,7 @@ impl Diag {
                 Meta::List(l) if l.path.is_ident("annot") => {
                     let mut asev: Option<Severity> = None;
                     let mut amsg: Option<Punctuated<Expr, Token![,]>> = None;
-                    let mut arepl: Option<Punctuated<Expr, Token![,]>> = None;
+                    let mut arepl: Option<(Type, Expr)> = None;
                     let mut aloc: Option<Expr> = None;
 
                     // Good. Now parse the list as meta attributes themselves...
@@ -360,9 +398,16 @@ impl Diag {
                                     return Err(Error::new(span, "Conflicting message specified"));
                                 }
                             },
-                            AnnotAttr::Replace(drepl, span) => {
+                            AnnotAttr::Replace(dty, drepl, span) => {
                                 if arepl.is_none() {
-                                    arepl = Some(drepl);
+                                    if let Some(elemty) = &elemty {
+                                        if elemty != &dty {
+                                            return Err(Error::new(dty.span(), "All replacement element types must be the same"));
+                                        }
+                                    } else {
+                                        elemty = Some(dty.clone());
+                                    }
+                                    arepl = Some((dty, drepl));
                                 } else {
                                     return Err(Error::new(span, "Conflicting replacement specified"));
                                 }
@@ -388,8 +433,8 @@ impl Diag {
                     for expr in amsg.iter_mut().flat_map(Punctuated::iter_mut) {
                         syn::visit_mut::visit_expr_mut(&mut IdentVisitor, expr);
                     }
-                    for expr in arepl.iter_mut().flat_map(Punctuated::iter_mut) {
-                        syn::visit_mut::visit_expr_mut(&mut IdentVisitor, expr);
+                    if let Some((_, arepl)) = &mut arepl {
+                        syn::visit_mut::visit_expr_mut(&mut IdentVisitor, arepl);
                     }
                     syn::visit_mut::visit_expr_mut(&mut IdentVisitor, &mut aloc);
                     annots.push(Annot { sev: asev, msg: amsg, repl: arepl, loc: aloc });
@@ -433,7 +478,7 @@ impl Diag {
         for expr in msg.iter_mut() {
             syn::visit_mut::visit_expr_mut(&mut IdentVisitor, expr);
         }
-        Ok(Diag { sev, code, msg, annots })
+        Ok(Diag { elemty, sev, code, msg, annots })
     }
 }
 
@@ -449,22 +494,25 @@ pub fn handle(item: TokenStream2) -> Result<TokenStream2, Error> {
         Data::Struct(s) => {
             // Parse toplevel attributes first
             let diag = Diag::parse_from_attrs(ident.span(), &attrs)?;
+            let inject_e: bool = diag.elemty.is_none();
+            let elemty: Type = diag.elemty.clone().unwrap_or_else(default_elemty);
 
             // Generate the field expansion of the struct
             let fields: TokenStream2 = generate_field_expansion_struct(&s.fields);
 
             // Generate individual annotations
-            let annots: Vec<TokenStream2> = diag.generate_annots();
+            let annots: Vec<TokenStream2> = diag.generate_annots(&elemty);
 
             // Then build
             let sev: Severity = diag.sev;
             let code: TokenStream2 = render_fstr_as_string(&diag.code);
             let msg: TokenStream2 = render_fstr_as_string_nonopt(&diag.msg);
-            let (impl_gen, ty_gen, where_clauses) = generics.split_for_impl();
+            let to_inject: &[&str] = if inject_e { &["__E"] } else { &[] };
+            let (impl_gen, ty_gen, where_clauses) = split_for_impl_with_extra(to_inject, &generics);
             Ok(quote! {
-                impl #impl_gen ::ast_toolkit2::diag::Diagnostic for #ident #ty_gen #where_clauses {
+                impl #impl_gen ::ast_toolkit2::diag::Diagnostic<#elemty> for #ident #ty_gen #where_clauses {
                     #[inline]
-                    fn into_diag(self) -> ::ast_toolkit2::diag::Diag {
+                    fn into_diag(self) -> ::ast_toolkit2::diag::Diag<#elemty> {
                         #fields;
                         ::ast_toolkit2::diag::Diag {
                             theme: ::ast_toolkit2::diag::Theme::PLAIN,
@@ -480,17 +528,31 @@ pub fn handle(item: TokenStream2) -> Result<TokenStream2, Error> {
             })
         },
         Data::Enum(e) => {
+            let diags = e.variants.iter().map(|v| Diag::parse_from_attrs(v.ident.span(), &v.attrs)).collect::<Result<Vec<Diag>, Error>>()?;
+            let mut elemty: Option<Type> = None;
+            for diag in &diags {
+                // Parse toplevel attributes first
+                if let Some(ty) = &diag.elemty {
+                    if let Some(ety) = &elemty {
+                        if ty != ety {
+                            return Err(Error::new(ty.span(), "All replacement element types must be the same"));
+                        }
+                    } else {
+                        elemty = Some(ty.clone());
+                    }
+                }
+            }
+            let inject_e: bool = elemty.is_none();
+            let elemty: Type = elemty.unwrap_or_else(default_elemty);
+
             // Go through each variant
             let mut variants: Vec<TokenStream2> = Vec::with_capacity(e.variants.len());
-            for variant in e.variants {
-                // Parse toplevel attributes first
-                let diag = Diag::parse_from_attrs(variant.ident.span(), &variant.attrs)?;
-
+            for (variant, diag) in e.variants.into_iter().zip(diags) {
                 // Generate the variant expansion
                 let match_arm: TokenStream2 = generate_field_expansion_variant(&variant.ident, &variant.fields);
 
                 // Generate individual annotations
-                let annots: Vec<TokenStream2> = diag.generate_annots();
+                let annots: Vec<TokenStream2> = diag.generate_annots(&elemty);
 
                 // Then build the individual match arm
                 let sev: Severity = diag.sev;
@@ -510,11 +572,12 @@ pub fn handle(item: TokenStream2) -> Result<TokenStream2, Error> {
             }
 
             // Now build the overall thing
-            let (impl_gen, ty_gen, where_clauses) = generics.split_for_impl();
+            let to_inject: &[&str] = if inject_e { &["__E"] } else { &[] };
+            let (impl_gen, ty_gen, where_clauses) = split_for_impl_with_extra(to_inject, &generics);
             Ok(quote! {
-                impl #impl_gen ::ast_toolkit2::diag::Diagnostic for #ident #ty_gen #where_clauses {
+                impl #impl_gen ::ast_toolkit2::diag::Diagnostic<#elemty> for #ident #ty_gen #where_clauses {
                     #[inline]
-                    fn into_diag(self) -> ::ast_toolkit2::diag::Diag {
+                    fn into_diag(self) -> ::ast_toolkit2::diag::Diag<#elemty> {
                         match self {
                             #(#variants)*
                         }
