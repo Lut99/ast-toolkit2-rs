@@ -8,6 +8,9 @@
 use std::error::Error;
 use std::fmt::{Display, Formatter, Result as FResult};
 use std::str::FromStr as _;
+use std::sync::LazyLock;
+
+use regex::bytes::Regex;
 
 
 /***** HELPER MACROS *****/
@@ -116,6 +119,19 @@ macro_rules! convert_float_impl {
         }
     };
 }
+
+
+
+
+
+/***** GLOBALS *****/
+/// A special regular expression that is used, by default, to match whitespace.
+///
+/// Regex: `^\s`.
+#[cfg(feature = "regex-unicode")]
+pub static WHITESPACE_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^\s+").unwrap());
+#[cfg(not(feature = "regex-unicode"))]
+pub static WHITESPACE_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[[:space:]]+").unwrap());
 
 
 

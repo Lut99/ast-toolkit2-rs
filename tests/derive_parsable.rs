@@ -37,6 +37,9 @@ pub struct LitInt {
 pub struct Fn(TestLoc);
 
 #[derive(Debug, Eq, PartialEq, Parsable)]
+#[parse(term = ",", whitespace)]
+pub struct Comma(TestLoc);
+#[derive(Debug, Eq, PartialEq, Parsable)]
 #[parse(term = ".")]
 pub struct Dot(TestLoc);
 
@@ -144,6 +147,16 @@ fn test_parsable_lit() {
     );
     assert_eq!(LitInt::parse(input6), Err(NibbleError::Unmatched("a literal matching the regex \"^[0-9]+\"", Loc::encapsulate_range(0, ..))));
     assert_eq!(LitInt::parse(input7), Err(NibbleError::Unmatched("a literal matching the regex \"^[0-9]+\"", Loc::encapsulate_range(0, ..))));
+}
+
+#[test]
+fn test_parsable_term_whitespace() {
+    let input1 = Slice::with_raw_id(0, b", ,");
+    let input2 = Slice::with_raw_id(0, b"    , ,");
+    let input3 = Slice::with_raw_id(0, b"    ,     ,");
+    assert_eq!(Comma::parse(input1), Ok((Comma(TestLoc::from(Loc::encapsulate_range(0, 0..1))), input1.slice(1..))));
+    assert_eq!(Comma::parse(input2), Ok((Comma(TestLoc::from(Loc::encapsulate_range(0, 4..5))), input2.slice(5..))));
+    assert_eq!(Comma::parse(input3), Ok((Comma(TestLoc::from(Loc::encapsulate_range(0, 4..5))), input3.slice(5..))));
 }
 
 #[test]

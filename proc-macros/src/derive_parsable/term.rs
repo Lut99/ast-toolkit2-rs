@@ -6,23 +6,20 @@
 //
 
 use proc_macro2::TokenStream as TokenStream2;
-use quote::{ToTokens as _, quote};
+use quote::{ToTokens, quote};
 use syn::{DataStruct, Error, Fields, Generics, Ident, LitStr};
 
-use super::OuterAttr;
+use super::{OuterAttr, whitespace_pop_impl};
 
 
 /***** LIBRARY *****/
 /// Handles the implementation.
 pub fn handle_impl(outer_attrs: &[OuterAttr], tag: &LitStr, ident: Ident, gens: Generics, data: DataStruct) -> Result<TokenStream2, Error> {
     // Prepare stuff
-    let expects: TokenStream2 = outer_attrs
-        .into_iter()
-        .find_map(|a| match a {
-            OuterAttr::Expects { what } => Some(what.to_token_stream()),
-            _ => None,
-        })
+    let expects: TokenStream2 = OuterAttr::has_expects(outer_attrs)
+        .map(ToTokens::to_token_stream)
         .unwrap_or_else(|| LitStr::new(&format!("{}", tag.value()), ident.span()).to_token_stream());
+    let (whitespace_init, whitespace_pop) = whitespace_pop_impl("rem", outer_attrs);
     let (impl_gen, ty_gen, where_bounds) = gens.split_for_impl();
 
     // Figure out how to build the terminal
@@ -53,7 +50,6 @@ pub fn handle_impl(outer_attrs: &[OuterAttr], tag: &LitStr, ident: Ident, gens: 
         quote! {
             if !<[u8]>::is_empty(&rem) {
                 // Check that it does *not* continue being an identifier
-                type Regex = ::ast_toolkit2::nibble::__macros::Regex;
                 static REGEX: ::std::sync::LazyLock<Regex> = ::std::sync::LazyLock::new(|| ::std::result::Result::unwrap_or_else(Regex::new(#regex), |err| ::std::panic!("Failed to compile regex {:?}: {err}", #regex)));
                 let regex = &*REGEX;
                 let slice = &rem[..1];
@@ -71,14 +67,6 @@ pub fn handle_impl(outer_attrs: &[OuterAttr], tag: &LitStr, ident: Ident, gens: 
 
     // Generate the impl
     Ok(quote! {
-        // #[doc = ::std::concat!("A formatter for the ", ::std::stringify!(#ident), " terminal.")]
-        // #[derive(::std::clone::Clone, ::std::marker::Copy, ::std::fmt::Debug, ::std::cmp::Eq, ::std::cmp::PartialEq)]
-        // #vis struct #fmt;
-        // impl ::std::fmt::Display for #fmt {
-        //     #[inline]
-        //     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result { ::std::write!(f, #expects) }
-        // }
-
         impl #impl_gen ::ast_toolkit2::nibble::Parsable<::std::primitive::u8> for #ident #ty_gen #where_bounds {
             type Formatter = &'static ::std::primitive::str;
 
@@ -86,12 +74,19 @@ pub fn handle_impl(outer_attrs: &[OuterAttr], tag: &LitStr, ident: Ident, gens: 
 
             fn expects() -> Self::Formatter { #expects }
 
-            fn parse(input: ::ast_toolkit2::nibble::Slice<::std::primitive::u8>) -> ::std::result::Result<(Self, ::ast_toolkit2::nibble::Slice<::std::primitive::u8>), ::ast_toolkit2::nibble::error::NibbleError<Self::Formatter, Self::Error>> {
+            fn parse(rem: ::ast_toolkit2::nibble::Slice<::std::primitive::u8>) -> ::std::result::Result<(Self, ::ast_toolkit2::nibble::Slice<::std::primitive::u8>), ::ast_toolkit2::nibble::error::NibbleError<Self::Formatter, Self::Error>> {
+                #[allow(unused)]
+                type Match<'a> = ::ast_toolkit2::nibble::__macros::Match<'a>;
+                #[allow(unused)]
+                type Regex = ::ast_toolkit2::nibble::__macros::Regex;
                 const TAG: &[::std::primitive::u8] = ::std::primitive::str::as_bytes(#tag);
+
+                #whitespace_init
+                #whitespace_pop
 
                 // Get the head slice
                 let tag_len: usize = <[::std::primitive::u8]>::len(TAG);
-                let ((head, loc), rem) = ::ast_toolkit2::nibble::Slice::head_slice_loc(input, tag_len);
+                let ((head, loc), rem) = ::ast_toolkit2::nibble::Slice::head_slice_loc(rem, tag_len);
 
                 // Check the overlapping part of the tag and the slice for equality
                 let head_len: usize = <[::std::primitive::u8]>::len(head);

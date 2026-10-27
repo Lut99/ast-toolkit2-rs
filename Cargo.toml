@@ -46,7 +46,7 @@ serde_json = "1.0.0"
 
 
 [features]
-default = ["loc", "tree"]
+default = ["loc", "regex-unicode", "tree"]
 
 # Aliases
 diagnostic = ["diag"]
@@ -67,6 +67,7 @@ color = ["dep:console"]
 macros = ["decl-macros", "proc-macros"]
 decl-macros = ["dep:ast-toolkit2-decl-macros"]
 proc-macros = ["dep:ast-toolkit2-proc-macros"]
+regex-unicode = ["regex/unicode"]
 serde = ["dep:serde"]
 
 

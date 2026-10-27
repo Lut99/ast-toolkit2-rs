@@ -15,7 +15,7 @@ use syn::{
     TraitBound, TraitBoundModifier, Type, TypeGenerics, TypeParamBound, TypePath, Visibility,
 };
 
-use super::OuterAttr;
+use super::{OuterAttr, whitespace_pop_impl};
 
 
 /***** HELPER FUNCTIONS *****/
@@ -286,13 +286,8 @@ impl<'t> ErrorImpl<'t> {
 /// Handles the implementation.
 pub fn handle_impl(outer_attrs: &[OuterAttr], vis: Visibility, ident: Ident, mut gens: Generics, data: DataStruct) -> Result<TokenStream2, Error> {
     // Check if there already exists an expects-string
-    let mut fmt = outer_attrs
-        .into_iter()
-        .find_map(|a| match a {
-            OuterAttr::Expects { what } => Some(FormatterImpl::Given(what)),
-            _ => None,
-        })
-        .unwrap_or_else(|| FormatterImpl::Generated(Vec::new()));
+    let mut fmt = OuterAttr::has_expects(outer_attrs).map(FormatterImpl::Given).unwrap_or_else(|| FormatterImpl::Generated(Vec::new()));
+    let (whitespace_init, whitespace_pop) = whitespace_pop_impl("rem", outer_attrs);
 
     // Cook up the error module name
     let error_mod = Ident::new(&ident.to_string().to_case(Case::Snake), ident.span());
@@ -357,6 +352,15 @@ pub fn handle_impl(outer_attrs: &[OuterAttr], vis: Visibility, ident: Ident, mut
             fn expects() -> Self::Formatter { #fmt_inst }
 
             fn parse(rem: ::ast_toolkit2::nibble::Slice<::std::primitive::u8>) -> ::std::result::Result<(Self, ::ast_toolkit2::nibble::Slice<::std::primitive::u8>), ::ast_toolkit2::nibble::error::NibbleError<Self::Formatter, Self::Error>> {
+                // Pop whitespace first
+                #[allow(unused)]
+                type Match<'a> = ::ast_toolkit2::nibble::__macros::Match<'a>;
+                #[allow(unused)]
+                type Regex = ::ast_toolkit2::nibble::__macros::Regex;
+                #whitespace_init
+                #whitespace_pop
+
+                // Then pop normally
                 #parse
                 ::std::result::Result::Ok((#inst, rem))
             }

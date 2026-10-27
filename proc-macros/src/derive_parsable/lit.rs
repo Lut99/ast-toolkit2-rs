@@ -6,24 +6,21 @@
 //
 
 use proc_macro2::TokenStream as TokenStream2;
-use quote::{ToTokens as _, quote};
+use quote::{ToTokens, quote};
 use syn::spanned::Spanned as _;
 use syn::{DataStruct, Error, Fields, Generics, Ident, LitStr, Type};
 
-use super::OuterAttr;
+use super::{OuterAttr, whitespace_pop_impl};
 
 
 /***** LIBRARY *****/
 /// Handles the implementation.
 pub fn handle_impl(outer_attrs: &[OuterAttr], regex: &LitStr, ident: Ident, gens: Generics, data: DataStruct) -> Result<TokenStream2, Error> {
     // Prepare stuff
-    let expects: TokenStream2 = outer_attrs
-        .into_iter()
-        .find_map(|a| match a {
-            OuterAttr::Expects { what } => Some(what.to_token_stream()),
-            _ => None,
-        })
+    let expects: TokenStream2 = OuterAttr::has_expects(outer_attrs)
+        .map(ToTokens::to_token_stream)
         .unwrap_or_else(|| LitStr::new(&format!("a literal matching the regex {:?}", regex.value()), ident.span()).to_token_stream());
+    let (whitespace_init, whitespace_pop) = whitespace_pop_impl("input", outer_attrs);
     let (impl_gen, ty_gen, where_bounds) = gens.split_for_impl();
 
     // Search for the type of the 'value' field
@@ -46,14 +43,6 @@ pub fn handle_impl(outer_attrs: &[OuterAttr], regex: &LitStr, ident: Ident, gens
 
     // Generate the impl
     Ok(quote! {
-        // #[doc = ::std::concat!("A formatter for the ", ::std::stringify!(#ident), " terminal.")]
-        // #[derive(::std::Clone, ::std::Copy, ::std::Debug, ::std::Eq, ::std::PartialEq)]
-        // #vis struct #fmt;
-        // impl ::std::fmt::Display for #fmt {
-        //     #[inline]
-        //     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result { ::std::write!(#expects) }
-        // }
-
         impl #impl_gen ::ast_toolkit2::nibble::Parsable<::std::primitive::u8> for #ident #ty_gen #where_bounds {
             type Formatter = &'static ::std::primitive::str;
 
@@ -64,6 +53,10 @@ pub fn handle_impl(outer_attrs: &[OuterAttr], regex: &LitStr, ident: Ident, gens
             fn parse(input: ::ast_toolkit2::nibble::Slice<::std::primitive::u8>) -> ::std::result::Result<(Self, ::ast_toolkit2::nibble::Slice<::std::primitive::u8>), ::ast_toolkit2::nibble::error::NibbleError<Self::Formatter, Self::Error>> {
                 type Match<'h> = ::ast_toolkit2::nibble::__macros::Match<'h>;
                 type Regex = ::ast_toolkit2::nibble::__macros::Regex;
+
+                // Pope whitespace first
+                #whitespace_init
+                #whitespace_pop
 
                 // Make sure we compile the regex only once.
                 static REGEX: ::std::sync::LazyLock<Regex> = ::std::sync::LazyLock::new(|| ::std::result::Result::unwrap_or_else(Regex::new(#regex), |err| ::std::panic!("Failed to compile regex {:?}: {err}", #regex)));

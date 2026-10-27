@@ -12,11 +12,12 @@ mod seq;
 mod term;
 
 // Imports
-use proc_macro2::TokenStream as TokenStream2;
+use proc_macro2::{Span, TokenStream as TokenStream2};
+use quote::quote;
 use syn::parse::Parser as _;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned as _;
-use syn::{Attribute, Data, DataUnion, DeriveInput, Error, Expr, ExprLit, Lit, LitStr, Meta, Token};
+use syn::{Attribute, Data, DataUnion, DeriveInput, Error, Expr, ExprLit, Ident, Lit, LitStr, Meta, Token};
 
 
 /***** HELPER FUNCTIONS *****/
@@ -43,6 +44,41 @@ fn parse_parse_attrs(attrs: &[Attribute]) -> Result<Vec<Meta>, Error> {
 
 
 
+/// Given a set of [`OuterAttr`]s, generates the correct whitespace-pop implementations.
+///
+/// # Returns
+/// The "init" implementation, compiling and setting up the regex; and the implementation doing a
+/// pop on a variable called `input`.
+fn whitespace_pop_impl(input: &'static str, attrs: &[OuterAttr]) -> (TokenStream2, TokenStream2) {
+    let input = Ident::new(input, Span::call_site());
+    let whitespace_init = OuterAttr::has_whitespace(attrs)
+        .map(|r| match r {
+            // Use the given regular expression
+            Some(regex) => quote! {
+                static WHITESPACE_REGEX: ::std::sync::LazyLock<Regex> = ::std::sync::LazyLock::new(|| ::std::result::Result::unwrap_or_else(Regex::new(#regex), |err| ::std::panic!("Failed to compile regex {:?}: {err}", #regex)));
+                let whitespace_regex = &*WHITESPACE_REGEX;
+            },
+            // Default to the global whitespace one
+            None => quote! {
+                let whitespace_regex = &*::ast_toolkit2::nibble::convert::WHITESPACE_REGEX;
+            },
+        }).unwrap_or_else(TokenStream2::new);
+    let whitespace_pop: TokenStream2 = if !whitespace_init.is_empty() {
+        quote! {
+            let #input = if let Some(m) = Regex::find(whitespace_regex, ::ast_toolkit2::nibble::Slice::as_slice(&#input)) {
+                ::ast_toolkit2::nibble::Slice::slice(#input, Match::end(&m)..)
+            } else {
+                #input
+            };
+        }
+    } else {
+        TokenStream2::new()
+    };
+    (whitespace_init, whitespace_pop)
+}
+
+
+
 
 
 /***** HELPERS *****/
@@ -56,6 +92,8 @@ enum OuterAttr {
     SepCheck { regex: LitStr },
     /// Represents that the struct is a terminal.
     Term { tag: LitStr },
+    /// Adds additional parsers accepting any whitespace.
+    Whitespace { regex: Option<LitStr> },
 }
 
 // Checking
@@ -85,6 +123,13 @@ impl OuterAttr {
     fn has_term(attrs: &[Self]) -> Option<&LitStr> {
         attrs.iter().find_map(|a| match a {
             OuterAttr::Term { tag } => Some(tag),
+            _ => None,
+        })
+    }
+    #[inline]
+    fn has_whitespace(attrs: &[Self]) -> Option<&Option<LitStr>> {
+        attrs.iter().find_map(|a| match a {
+            OuterAttr::Whitespace { regex } => Some(regex),
             _ => None,
         })
     }
@@ -136,6 +181,14 @@ impl OuterAttr {
                     };
                     res.push(Self::SepCheck { regex });
                 },
+                Meta::NameValue(nv) if nv.path.is_ident("whitespace") => {
+                    let Expr::Lit(ExprLit { attrs: _, lit: Lit::Str(regex) }) = nv.value else {
+                        return Err(Error::new(nv.value.span(), "Expected a string literal"));
+                    };
+                    res.push(Self::Whitespace { regex: Some(regex) });
+                },
+
+                Meta::Path(p) if p.is_ident("whitespace") => res.push(Self::Whitespace { regex: None }),
 
                 Meta::List(l) => {
                     return Err(Error::new(
