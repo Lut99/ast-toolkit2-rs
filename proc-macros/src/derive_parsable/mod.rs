@@ -191,7 +191,7 @@ pub fn handle(item: TokenStream2) -> Result<TokenStream2, Error> {
                 lit::handle_impl(&attrs, regex, ident, generics, s)
             } else {
                 // Handle as a sequence
-                todo!()
+                seq::handle_impl(&attrs, vis, ident, generics, s)
             }
         },
         Data::Enum(e) => {

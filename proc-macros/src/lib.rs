@@ -195,6 +195,10 @@ pub fn derive_located(item: TokenStream) -> TokenStream {
 
 // ast_toolkit2::nibble
 /// TODO
+/// A lot
+///
+/// Including:
+/// - type generation name collisions for sequences;
 #[cfg(feature = "nibble")]
 #[proc_macro_derive(Parsable, attributes(parse))]
 pub fn derive_parsable(item: TokenStream) -> TokenStream {

@@ -14,6 +14,18 @@ use ast_toolkit2::nibble::{NibbleError, Parsable, Slice};
 
 /***** AST *****/
 #[derive(Debug, Eq, PartialEq, Parsable)]
+pub struct LitIntDot {
+    lit: LitInt,
+    dot: Dot,
+}
+#[derive(Debug, Eq, PartialEq, Parsable)]
+#[parse(expected = "a silly example")]
+pub struct FnDot {
+    fn_token: Fn,
+    dot:      Dot,
+}
+
+#[derive(Debug, Eq, PartialEq, Parsable)]
 #[parse(lit = "^[0-9]+")]
 pub struct LitInt {
     value: u64,
@@ -33,6 +45,83 @@ pub struct Dot(TestLoc);
 
 
 /***** TESTS *****/
+#[test]
+fn test_parsable_seq() {
+    let input1 = Slice::with_raw_id(0, b"12.");
+    let input2 = Slice::with_raw_id(0, b"9999999.");
+    let input3 = Slice::with_raw_id(0, b"12");
+    let input4 = Slice::with_raw_id(0, b".");
+    let input5 = Slice::with_raw_id(0, b"99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999.");
+    let input6 = Slice::with_raw_id(0, b"");
+    assert_eq!(
+        LitIntDot::parse(input1),
+        Ok((
+            LitIntDot {
+                lit: LitInt { value: 12, loc: TestLoc::from(Loc::encapsulate_range(0, 0..2)) },
+                dot: Dot(TestLoc::from(Loc::encapsulate_range(0, 2..3))),
+            },
+            input1.slice(3..)
+        ))
+    );
+    assert_eq!(
+        LitIntDot::parse(input2),
+        Ok((
+            LitIntDot {
+                lit: LitInt { value: 9999999, loc: TestLoc::from(Loc::encapsulate_range(0, 0..7)) },
+                dot: Dot(TestLoc::from(Loc::encapsulate_range(0, 7..8))),
+            },
+            input2.slice(8..)
+        ))
+    );
+    assert_eq!(
+        LitIntDot::parse(input3),
+        Err(NibbleError::NotEnough(
+            lit_int_dot::Formatter { lit: "a literal matching the regex \"^[0-9]+\"", dot: "." },
+            Needed::Bounded(1, 1),
+            Loc::encapsulate_range(0, 2..2)
+        ))
+    );
+    assert_eq!(
+        LitIntDot::parse(input4),
+        Err(NibbleError::Unmatched(
+            lit_int_dot::Formatter { lit: "a literal matching the regex \"^[0-9]+\"", dot: "." },
+            Loc::encapsulate_range(0, ..)
+        ))
+    );
+    assert_eq!(
+        LitIntDot::parse(input5),
+        Err(NibbleError::Error(lit_int_dot::Error::Lit(ParseIntError::Overflow(
+            64,
+            b"99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999".into()
+        ))))
+    );
+    assert_eq!(
+        LitIntDot::parse(input6),
+        Err(NibbleError::Unmatched(
+            lit_int_dot::Formatter { lit: "a literal matching the regex \"^[0-9]+\"", dot: "." },
+            Loc::encapsulate_range(0, ..)
+        ))
+    );
+}
+
+#[test]
+fn test_parsable_seq_expects() {
+    let input1 = Slice::with_raw_id(0, b"fn.");
+    let input2 = Slice::with_raw_id(0, b"fn");
+    let input3 = Slice::with_raw_id(0, b".");
+    let input4 = Slice::with_raw_id(0, b"");
+    assert_eq!(
+        FnDot::parse(input1),
+        Ok((
+            FnDot { fn_token: Fn(TestLoc::from(Loc::encapsulate_range(0, 0..2))), dot: Dot(TestLoc::from(Loc::encapsulate_range(0, 2..3))) },
+            input1.slice(3..)
+        ))
+    );
+    assert_eq!(FnDot::parse(input2), Err(NibbleError::NotEnough("a silly example", Needed::Bounded(1, 1), Loc::encapsulate_range(0, 2..2))));
+    assert_eq!(FnDot::parse(input3), Err(NibbleError::Unmatched("a silly example", Loc::encapsulate_range(0, ..1))));
+    assert_eq!(FnDot::parse(input4), Err(NibbleError::NotEnough("a silly example", Needed::Bounded(2, 2), Loc::encapsulate_range(0, 0..0))));
+}
+
 #[test]
 fn test_parsable_lit() {
     let input1 = Slice::with_raw_id(0, b"12");
