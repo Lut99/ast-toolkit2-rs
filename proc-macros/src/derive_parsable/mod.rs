@@ -17,6 +17,7 @@ use quote::quote;
 use syn::ext::IdentExt;
 use syn::parse::{Parse, ParseStream, Parser as _};
 use syn::punctuated::Punctuated;
+use syn::spanned::Spanned as _;
 use syn::{
     AngleBracketedGenericArguments, Attribute, Data, DataUnion, DeriveInput, Error, GenericArgument, Generics, Ident, LitStr, Meta, Path,
     PathArguments, PathSegment, Token, TraitBound, Type, TypeParamBound, TypePath,
@@ -79,6 +80,64 @@ fn whitespace_pop_impl(input: &'static str, attrs: &[OuterAttr]) -> (TokenStream
         TokenStream2::new()
     };
     (whitespace_init, whitespace_pop)
+}
+
+
+
+/// Master function for generating the "as"-implementation of a type; completely parse it as some
+/// other type, then convert it.
+fn generate_as_impl(ident: &Ident, gens: &Generics, other: &Type) -> TokenStream2 {
+    let (impl_gen, ty_gen, where_clause) = gens.split_for_impl();
+    quote! {
+        impl #impl_gen ::ast_toolkit2::nibble::Parsable<::std::primitive::u8> #ty_gen for #ident #where_clause {
+            type Formatter = <#other as ::ast_toolkit2::nibble::Parsable<::std::primitive::u8>>::Formatter;
+            type Error = <#other as ::ast_toolkit2::nibble::Parsable<::std::primitive::u8>>::Error;
+
+            #[inline]
+            fn expects() -> Self::Formatter {
+                <#other as ::ast_toolkit2::nibble::Parsable<::std::primitive::u8>>::expects()
+            }
+
+            #[inline]
+            fn parse(input: ::ast_toolkit2::nibble::Slice<::std::primitive::u8>) -> ::std::result::Result<(Self, ::ast_toolkit2::nibble::Slice<::std::primitive::u8>), ::ast_toolkit2::nibble::error::NibbleError<Self::Formatter, Self::Error>> {
+                ::std::result::Result::map(<#other as ::ast_toolkit2::nibble::Parsable<::std::primitive::u8>>::parse(input), |(other, rem)| (::std::convert::From::from(other), rem))
+            }
+        }
+    }
+}
+
+/// Master function for generating the "as"-implementation of a type; completely parse it as some
+/// other type, then convert it.
+fn generate_try_as_impl(ident: &Ident, gens: &Generics, other: &Type) -> TokenStream2 {
+    let (impl_gen, ty_gen, where_clause) = gens.split_for_impl();
+    quote! {
+        impl #impl_gen ::ast_toolkit2::nibble::Parsable<::std::primitive::u8> #ty_gen for #ident #where_clause {
+            type Formatter = <#other as ::ast_toolkit2::nibble::Parsable<::std::primitive::u8>>::Formatter;
+            type Error = ::ast_toolkit2::error::contrib::TryAsError<
+                <#other as ::ast_toolkit2::nibble::Parsable<::std::primitive::u8>>::Error,
+                <#ident as ::std::convert::TryFrom>::Error,
+            >;
+
+            #[inline]
+            fn expects() -> Self::Formatter {
+                <#other as ::ast_toolkit2::nibble::Parsable<::std::primitive::u8>>::expects()
+            }
+
+            #[inline]
+            fn parse(input: ::ast_toolkit2::nibble::Slice<::std::primitive::u8>) -> ::std::result::Result<(Self, ::ast_toolkit2::nibble::Slice<::std::primitive::u8>), ::ast_toolkit2::nibble::error::NibbleError<Self::Formatter, Self::Error>> {
+                ::std::result::Result::and_then(
+                    ::std::result::Result::map_err(
+                        <#other as ::ast_toolkit2::nibble::Parsable<::std::primitive::u8>>::parse(input),
+                        ::ast_toolkit2::error::contrib::TryAsError::Parse,
+                    ),
+                    |(other, rem)| ::std::result::Result::Ok((
+                        ::std::convert::TryFrom::try_from(other).map_err(::ast_toolkit2::error::contrib::TryAsError::TryFrom)?,
+                        rem,
+                    ))
+                )
+            }
+        }
+    }
 }
 
 
@@ -152,6 +211,8 @@ trait Attr: Parse {
 
 /// Defines- and parses outer attributes.
 enum OuterAttr {
+    /// Parses another type, then uses from to turn A into B.
+    As { other: Type },
     /// Represents a custom expects string.
     Expects { what: LitStr },
     /// Represents that the struct is a literal.
@@ -162,12 +223,21 @@ enum OuterAttr {
     SepCheck { regex: LitStr },
     /// Represents that the struct is a terminal.
     Term { tag: LitStr },
+    /// Parses another type, then uses try_from to turn A into B.
+    TryAs { other: Type },
     /// Adds additional parsers accepting any whitespace.
     Whitespace { regex: Option<LitStr> },
 }
 
 // Checking
 impl OuterAttr {
+    #[inline]
+    fn has_as(attrs: &[Self]) -> Option<&Type> {
+        attrs.iter().find_map(|a| match a {
+            OuterAttr::As { other } => Some(other),
+            _ => None,
+        })
+    }
     #[inline]
     fn has_expects(attrs: &[Self]) -> Option<&LitStr> {
         attrs.iter().find_map(|a| match a {
@@ -204,6 +274,13 @@ impl OuterAttr {
         })
     }
     #[inline]
+    fn has_try_as(attrs: &[Self]) -> Option<&Type> {
+        attrs.iter().find_map(|a| match a {
+            OuterAttr::TryAs { other } => Some(other),
+            _ => None,
+        })
+    }
+    #[inline]
     fn has_whitespace(attrs: &[Self]) -> Option<&Option<LitStr>> {
         attrs.iter().find_map(|a| match a {
             OuterAttr::Whitespace { regex } => Some(regex),
@@ -214,6 +291,21 @@ impl OuterAttr {
 impl Attr for OuterAttr {
     /// Check if the list of attributes makes sense.
     fn check_consistency(attrs: &[Self]) -> Result<(), Error> {
+        if let Some(a) = Self::has_as(attrs)
+            && (Self::has_term(attrs).is_some() || Self::has_lit(attrs).is_some())
+        {
+            return Err(Error::new(a.span(), "`as` can only be used without `term` or `sep`"));
+        }
+        if let Some(t) = Self::has_try_as(attrs)
+            && (Self::has_term(attrs).is_some() || Self::has_lit(attrs).is_some())
+        {
+            return Err(Error::new(t.span(), "`try_as` can only be used without `term` or `sep`"));
+        }
+        if let Some(a) = Self::has_as(attrs)
+            && Self::has_try_as(attrs).is_some()
+        {
+            return Err(Error::new(a.span(), "`as` and `try_as` are mutually exclusive"));
+        }
         if let Some(lit) = Self::has_lit(attrs)
             && Self::has_term(attrs).is_some()
         {
@@ -238,7 +330,10 @@ impl Parse for OuterAttr {
     fn parse(input: ParseStream) -> Result<Self, Error> {
         // The stream must begin with an identifier
         let ident: Ident = Ident::parse_any(input)?;
-        if ident == "expects" || ident == "expected" {
+        if ident == "as" {
+            input.parse::<Token![=]>()?;
+            Ok(Self::As { other: input.parse()? })
+        } else if ident == "expects" || ident == "expected" {
             input.parse::<Token![=]>()?;
             Ok(Self::Expects { what: input.parse()? })
         } else if ident == "lit" || ident == "literal" {
@@ -250,6 +345,9 @@ impl Parse for OuterAttr {
         } else if ident == "term" || ident == "terminal" {
             input.parse::<Token![=]>()?;
             Ok(Self::Term { tag: input.parse()? })
+        } else if ident == "try_as" {
+            input.parse::<Token![=]>()?;
+            Ok(Self::TryAs { other: input.parse()? })
         } else if ident == "sep" || ident == "sep_check" {
             input.parse::<Token![=]>()?;
             Ok(Self::SepCheck { regex: input.parse()? })
@@ -265,21 +363,19 @@ impl Parse for OuterAttr {
 
 
 /// Defines- and parses variant attributes.
-enum VariantAttr {}
+enum VariantAttr {
+    /// It's to skip.
+    Skip,
+}
 
 // Checking
 impl VariantAttr {
-    // #[inline]
-    // fn has_expects(attrs: &[Self]) -> Option<&LitStr> {
-    //     attrs.iter().find_map(|a| match a {
-    //         VariantAttr::Expects { what } => Some(what),
-    //         _ => None,
-    //     })
-    // }
+    #[inline]
+    fn has_skip(attrs: &[Self]) -> bool { attrs.iter().any(|a| matches!(a, Self::Skip)) }
 }
 impl Attr for VariantAttr {
-    /// Check if the list of attributes makes sense.
-    fn check_consistency(attrs: &[Self]) -> Result<(), Error> { Ok(()) }
+    #[inline]
+    fn check_consistency(_attrs: &[Self]) -> Result<(), Error> { Ok(()) }
 }
 
 // Parsing
@@ -287,7 +383,32 @@ impl Parse for VariantAttr {
     fn parse(input: ParseStream) -> Result<Self, Error> {
         // The stream must begin with an identifier
         let ident: Ident = Ident::parse_any(input)?;
-        Err(Error::new(ident.span(), &format!("Unknown `parse` variant attribute {:?}", ident.to_string())))
+        if ident == "skip" { Ok(Self::Skip) } else { Err(Error::new(ident.span(), &format!("Unknown `parse` variant attribute {ident:?}"))) }
+    }
+}
+
+
+
+/// Either an [`OuterAttr`] or a [`VariantAttr`].
+enum OuterOrVariantAttr {
+    Outer(OuterAttr),
+    Variant(VariantAttr),
+}
+
+// Checking
+impl Attr for OuterOrVariantAttr {
+    #[inline]
+    fn check_consistency(_attrs: &[Self]) -> Result<(), Error> { Ok(()) }
+}
+
+// Parsing
+impl Parse for OuterOrVariantAttr {
+    #[inline]
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        OuterAttr::parse(input)
+            .map(Self::Outer)
+            .or_else(|_| VariantAttr::parse(input).map(Self::Variant))
+            .map_err(|err| Error::new(err.span(), "Unknown `parse` outer- or variant attribute"))
     }
 }
 
@@ -295,10 +416,12 @@ impl Parse for VariantAttr {
 
 /// Defines- and parses field attributes.
 enum FieldAttr {
-    /// Parses another type, then uses try_from to turn A into B.
+    /// Parses another type, then uses from to turn A into B.
     As { other: Type },
     /// Skips this field, using its default implementation instead.
     Skip,
+    /// Parses another type, then uses try_from to turn A into B.
+    TryAs { other: Type },
 }
 
 // Checking
@@ -310,13 +433,27 @@ impl FieldAttr {
             _ => None,
         })
     }
+    #[inline]
+    fn has_try_as(attrs: &[Self]) -> Option<&Type> {
+        attrs.iter().find_map(|a| match a {
+            Self::TryAs { other } => Some(other),
+            _ => None,
+        })
+    }
 
     #[inline]
     fn has_skip(attrs: &[Self]) -> bool { attrs.iter().find(|a| matches!(a, Self::Skip)).is_some() }
 }
 impl Attr for FieldAttr {
     /// Check if the list of attributes makes sense.
-    fn check_consistency(attrs: &[Self]) -> Result<(), Error> { Ok(()) }
+    fn check_consistency(attrs: &[Self]) -> Result<(), Error> {
+        if let Some(other) = Self::has_as(attrs)
+            && Self::has_try_as(attrs).is_some()
+        {
+            return Err(Error::new(other.span(), "`as` and `try_as` are mutually exclusive"));
+        }
+        Ok(())
+    }
 }
 
 // Parsing
@@ -327,6 +464,9 @@ impl Parse for FieldAttr {
         if ident == "as" {
             input.parse::<Token![=]>()?;
             Ok(Self::As { other: input.parse()? })
+        } else if ident == "try_as" {
+            input.parse::<Token![=]>()?;
+            Ok(Self::TryAs { other: input.parse()? })
         } else if ident == "skip" {
             Ok(Self::Skip)
         } else {
@@ -345,6 +485,14 @@ pub fn handle(item: TokenStream2) -> Result<TokenStream2, Error> {
     // Collect some general information
     let DeriveInput { attrs, vis, ident, generics, data } = syn::parse2(item)?;
     let attrs: Vec<OuterAttr> = parse_parse_attrs(&attrs)?;
+
+    // In all cases, simply defer to `TryFrom` if the user asks us to
+    if let Some(other) = OuterAttr::has_as(&attrs) {
+        return Ok(generate_as_impl(&ident, &generics, other));
+    }
+    if let Some(other) = OuterAttr::has_try_as(&attrs) {
+        return Ok(generate_try_as_impl(&ident, &generics, other));
+    }
 
     // Handle each one individually
     match data {
@@ -366,6 +514,7 @@ pub fn handle(item: TokenStream2) -> Result<TokenStream2, Error> {
                 seq::handle_impl(
                     &attrs,
                     vis,
+                    ident.clone(),
                     Path {
                         leading_colon: None,
                         segments:      {

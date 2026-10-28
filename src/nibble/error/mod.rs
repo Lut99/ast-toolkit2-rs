@@ -6,6 +6,8 @@
 //
 
 // Submodules
+#[cfg(feature = "proc-macros")]
+pub mod contrib;
 mod result_ext;
 
 // Imports

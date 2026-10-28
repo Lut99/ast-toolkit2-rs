@@ -5,6 +5,8 @@
 //!   Implements the logic for structs, i.e., sequential parsers.
 //
 
+use std::collections::HashMap;
+
 use convert_case::{Case, Casing as _};
 use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::{ToTokens, quote};
@@ -43,7 +45,7 @@ pub fn cook_up_error_mod_name(attrs: &[OuterAttr], ident: &Path) -> Ident {
 
 
 /***** HELPERS *****/
-enum StructTy {
+pub enum StructTy {
     Named,
     Unnamed,
     Unit,
@@ -61,21 +63,22 @@ impl<'a> From<&'a Fields> for StructTy {
 
 
 
-struct FieldInfo {
-    name: Ident,
-    camel_name: Ident,
-    ty: Type,
-    as_ty: Option<Type>,
-    skip: bool,
+pub struct FieldInfo {
+    pub name: Ident,
+    pub camel_name: Ident,
+    pub ty: Type,
+    pub as_ty: Option<Type>,
+    pub try_as: bool,
+    pub skip: bool,
 }
 impl FieldInfo {
     /// Returns the type we're actually parsing.
     #[inline]
-    fn parsed_ty(&self) -> &Type { self.as_ty.as_ref().unwrap_or(&self.ty) }
+    pub fn parsed_ty(&self) -> &Type { self.as_ty.as_ref().unwrap_or(&self.ty) }
 
     /// Returns the as-type name of the extra error variant, if applicable.
     #[inline]
-    fn as_error_name(&self, span: Span) -> Ident { Ident::new(&format!("{}TryFrom", self.camel_name), span) }
+    pub fn as_error_name(&self, span: Span) -> Ident { Ident::new(&format!("{}TryFrom", self.camel_name), span) }
 }
 impl TryFrom<(usize, Field)> for FieldInfo {
     type Error = Error;
@@ -87,7 +90,9 @@ impl TryFrom<(usize, Field)> for FieldInfo {
 
         // Read attributes for this field
         let field_attrs: Vec<FieldAttr> = parse_parse_attrs(&attrs)?;
-        let as_ty: Option<Type> = FieldAttr::has_as(&field_attrs).cloned();
+        let try_as_ty: Option<&Type> = FieldAttr::has_try_as(&field_attrs);
+        let as_ty: Option<Type> = FieldAttr::has_as(&field_attrs).or(try_as_ty).cloned();
+        let try_as: bool = try_as_ty.is_some();
         let skip: bool = FieldAttr::has_skip(&field_attrs);
 
         // Compute some names for this field
@@ -95,7 +100,7 @@ impl TryFrom<(usize, Field)> for FieldInfo {
         let camel_name: Ident = Ident::new(&name.to_string().to_case(Case::Pascal), name.span());
 
         // Done!
-        Ok(Self { name, camel_name, ty, as_ty, skip })
+        Ok(Self { name, camel_name, ty, as_ty, try_as, skip })
     }
 }
 
@@ -104,7 +109,7 @@ impl TryFrom<(usize, Field)> for FieldInfo {
 /// Everything we need to know about generating a formatter impl.
 ///
 /// Note this is *either* a given string, or a generated formatter.
-enum FormatterImpl<'a> {
+pub enum FormatterImpl<'a> {
     Given(&'a LitStr),
     Generated(&'a [FieldInfo]),
     Single(&'a FieldInfo),
@@ -112,7 +117,7 @@ enum FormatterImpl<'a> {
 }
 impl<'a> FormatterImpl<'a> {
     /// Builds a new Self.
-    fn new<'o, 'f>(outer_attrs: &'o [OuterAttr], fields: &'f [FieldInfo]) -> Self
+    pub fn new<'o, 'f>(outer_attrs: &'o [OuterAttr], fields: &'f [FieldInfo]) -> Self
     where
         'o: 'a,
         'f: 'a,
@@ -151,6 +156,10 @@ impl<'a> FormatterImpl<'a> {
 
     /// Returns a generator for the instantiation of whatever type this FormatterImpl is.
     fn inst<'e>(&self, error_mod: &'e Ident) -> FormatterImplInst<'e, '_, 'a> { FormatterImplInst(error_mod, self) }
+
+
+    /// Returns a map describing the new formatters generated.
+    pub fn generated_map(&self, error_mod: &Ident) -> HashMap<String, Path> { HashMap::new() }
 }
 
 struct FormatterImplDef<'i, 'g, 's, 'a>(&'i Path, &'g Generics, &'s FormatterImpl<'a>);
@@ -158,11 +167,12 @@ impl<'i, 'g, 's, 'a> ToTokens for FormatterImplDef<'i, 'g, 's, 'a> {
     #[inline]
     fn to_tokens(&self, tokens: &mut TokenStream2) {
         // Only do something if we're generated
-        let FormatterImpl::Generated(fmt) = &self.2 else { return };
+        let FormatterImpl::Generated(fields) = &self.2 else { return };
 
         // Compute the definition of every field in the formatter...
-        let fields_def: TokenStream2 = fmt
+        let fields_def: TokenStream2 = fields
             .into_iter()
+            .filter(|field| !field.skip)
             .map(|field| {
                 let name = &field.name;
                 let ty = field.parsed_ty();
@@ -171,7 +181,7 @@ impl<'i, 'g, 's, 'a> ToTokens for FormatterImplDef<'i, 'g, 's, 'a> {
             .collect();
 
         // Compute the `Display` implementation for every field...
-        let mut iter = fmt.into_iter();
+        let mut iter = fields.into_iter().filter(|field| !field.skip);
         // SAFETY: This is OK because we only get here if there's something to generate in the first place
         let first = iter.next().unwrap();
         let fname = &first.name;
@@ -260,14 +270,14 @@ impl<'e, 's, 't> ToTokens for FormatterImplInst<'e, 's, 't> {
 
 
 /// Everything we need to know about generating an error type impl.
-enum ErrorImpl<'a> {
+pub enum ErrorImpl<'a> {
     Generated(&'a [FieldInfo]),
     Single(&'a FieldInfo),
     None,
 }
 impl<'a> ErrorImpl<'a> {
     /// Builds a new Self.
-    fn new(fields: &'a [FieldInfo]) -> Self {
+    pub fn new(fields: &'a [FieldInfo]) -> Self {
         // Check if we need to generate any formatter.
         //
         // This is NOT the case if:
@@ -277,7 +287,7 @@ impl<'a> ErrorImpl<'a> {
         // Note that this is slightly more complicated than the formatter bc of as-conversion
         // errors.
         let nonskipped_field_count: usize = fields.into_iter().filter(|f| !f.skip).count();
-        if nonskipped_field_count > 1 || fields.into_iter().any(|f| f.as_ty.is_some()) {
+        if nonskipped_field_count > 1 || fields.into_iter().any(|f| f.try_as) {
             Self::Generated(fields)
         } else if nonskipped_field_count == 1 {
             Self::Single(fields.into_iter().filter(|f| !f.skip).next().unwrap())
@@ -304,11 +314,12 @@ impl<'i, 'g, 's, 'a> ToTokens for ErrorImplDef<'i, 'g, 's, 'a> {
         // Generate the definition of each variant
         let vars_def: TokenStream2 = fields
             .into_iter()
+            .filter(|field| !field.skip)
             .map(|field| {
                 let name = &field.camel_name;
                 let ty = field.parsed_ty();
                 let mut res = quote! { #name(<#ty as ::ast_toolkit2::nibble::Parsable<::std::primitive::u8>>::Error), };
-                if let Some(as_ty) = &field.as_ty {
+                if let Some(as_ty) = &field.as_ty && field.try_as {
                     let og_ty = &field.ty;
                     let as_error_name = field.as_error_name(field.name.span());
                     res.extend(quote! { #as_error_name { from: &'static ::std::primitive::str, to: &'static ::std::primitive::str, err: <#og_ty as ::std::convert::TryFrom<#as_ty>>::Error }, });
@@ -320,10 +331,11 @@ impl<'i, 'g, 's, 'a> ToTokens for ErrorImplDef<'i, 'g, 's, 'a> {
         // Generate the `Display` implementation for every variant
         let fmt_impl: TokenStream2 = fields
             .into_iter()
+            .filter(|field| !field.skip)
             .map(|field| {
                 let name = &field.camel_name;
                 let mut res = quote! { Self::#name(err) => ::std::fmt::Display::fmt(err, f), };
-                if field.as_ty.is_some() {
+                if field.as_ty.is_some() && field.try_as {
                     let as_error_name = field.as_error_name(field.name.span());
                     res.extend(quote! { Self::#as_error_name { from, to, .. } => ::std::write!(f, "Failed to convert from {from} to {to}"), });
                 }
@@ -334,10 +346,11 @@ impl<'i, 'g, 's, 'a> ToTokens for ErrorImplDef<'i, 'g, 's, 'a> {
         // Generate the `Error` implementation for every variant
         let source_impl: TokenStream2 = fields
             .into_iter()
+            .filter(|field| !field.skip)
             .map(|field| {
                 let name = &field.camel_name;
                 let mut res = quote! { Self::#name(err) => ::std::error::Error::source(err), };
-                if field.as_ty.is_some() {
+                if field.as_ty.is_some() && field.try_as {
                     let as_error_name = field.as_error_name(field.name.span());
                     res.extend(quote! { Self::#as_error_name { err, .. } => ::std::option::Option::Some(err), });
                 }
@@ -401,23 +414,44 @@ impl<'e, 's, 'a> ToTokens for ErrorImplTy<'e, 's, 'a> {
 
 
 /***** LIBRARY *****/
-/// Handles the implementation.
-pub fn handle_impl(outer_attrs: &[OuterAttr], vis: Visibility, ident: Path, mut gens: Generics, fields: Fields) -> Result<TokenStream2, Error> {
-    // Do some outer attribute processing
+/// Generates an implementation for the module, i.e., auxillary types.
+pub fn generate_mod_impl(error_mod: &Ident, vis: &Visibility, constr: &Path, gens: &Generics, fmt: &FormatterImpl, err: &ErrorImpl) -> TokenStream2 {
+    // Generate the module impl
+    if matches!(fmt, FormatterImpl::Generated(_)) || matches!(err, ErrorImpl::Generated(_)) {
+        let fmt_def = fmt.def(&constr, &gens);
+        let err_def = err.def(&constr, &gens);
+        quote! {
+            #[doc = ::std::concat!("Helper module for [`", ::std::stringify!(#constr), "`] containing auxillary types.")]
+            #vis mod #error_mod {
+                use super::*;
+
+                #fmt_def
+
+                #err_def
+            }
+        }
+    } else {
+        TokenStream2::new()
+    }
+}
+
+/// Generates an implementation for the module, i.e., auxillary types.
+pub fn generate_parsable_impl(
+    error_mod: &Ident,
+    outer_attrs: &[OuterAttr],
+    ident: &Ident,
+    constr: &Path,
+    mut gens: Generics,
+    struct_ty: StructTy,
+    fields: &[FieldInfo],
+    fmt: &FormatterImpl,
+    err: &ErrorImpl,
+) -> TokenStream2 {
     let (whitespace_init, whitespace_pop) = whitespace_pop_impl("rem", outer_attrs);
-    let error_mod = cook_up_error_mod_name(outer_attrs, &ident);
-
-    // First, analyze each field and remember what we need to keep
-    let struct_ty = StructTy::from(&fields);
-    let fields = fields.into_iter().enumerate().map(FieldInfo::try_from).collect::<Result<Vec<FieldInfo>, Error>>()?;
-
-    // Decide on the formatter & error impls
-    let fmt = FormatterImpl::new(outer_attrs, &fields);
-    let err = ErrorImpl::new(&fields);
 
     // Generate the main implementation based on the field infos
     let mut parse_impl = TokenStream2::new();
-    for field in &fields {
+    for field in fields {
         // Check whether to generate a default implementation, or a field-based implementation
         let name = &field.name;
         let ty = field.parsed_ty();
@@ -451,55 +485,44 @@ pub fn handle_impl(outer_attrs: &[OuterAttr], vis: Visibility, ident: Path, mut 
 
         // Don't forget to convert types if necessary
         if let Some(as_ty) = &field.as_ty {
-            let as_error_name = field.as_error_name(field.name.span());
             let og_ty = &field.ty;
-            parse_impl.extend(quote! {
-                let #name: #og_ty = ::std::result::Result::map_err(
-                    ::std::convert::TryFrom::try_from(#name),
-                    |err| #error_mod::Error::#as_error_name {
-                        from: ::std::any::type_name::<#as_ty>(),
-                        to: ::std::any::type_name::<#og_ty>(),
-                        err
-                    }
-                )?;
-            });
+            if !field.try_as {
+                parse_impl.extend(quote! {
+                    let #name: #og_ty = ::std::convert::From::from(#name);
+                });
+            } else {
+                let as_error_name = field.as_error_name(field.name.span());
+                parse_impl.extend(quote! {
+                    let #name: #og_ty = ::std::result::Result::map_err(
+                        ::std::convert::TryFrom::try_from(#name),
+                        |err| #error_mod::Error::#as_error_name {
+                            from: ::std::any::type_name::<#as_ty>(),
+                            to: ::std::any::type_name::<#og_ty>(),
+                            err
+                        }
+                    )?;
+                });
+            }
         }
     }
 
     // Generate the instantiation at the end of the parse
     let inst_impl: Punctuated<TokenStream2, Token![,]> = fields.iter().map(|field| field.name.to_token_stream()).collect();
     let inst_impl = match struct_ty {
-        StructTy::Named => quote! { Self { #inst_impl } },
-        StructTy::Unnamed => quote! { Self(#inst_impl) },
-        StructTy::Unit => quote! { Self },
+        StructTy::Named => quote! { #constr { #inst_impl } },
+        StructTy::Unnamed => quote! { #constr(#inst_impl) },
+        StructTy::Unit => quote! { #constr },
     };
 
     // Prepare generics by inserting the bound
     inject_parsable_bound(&mut gens);
     let (impl_gen, ty_gen, where_bounds) = gens.split_for_impl();
 
-    // Generate the module impl
-    let mut res = TokenStream2::new();
-    if matches!(fmt, FormatterImpl::Generated(_)) || matches!(err, ErrorImpl::Generated(_)) {
-        let fmt_def = fmt.def(&ident, &gens);
-        let err_def = err.def(&ident, &gens);
-        res.extend(quote! {
-            #[doc = ::std::concat!("Helper module for [`", ::std::stringify!(#ident), "`] containing auxillary types.")]
-            #vis mod #error_mod {
-                use super::*;
-
-                #fmt_def
-
-                #err_def
-            }
-        });
-    }
-
     // Generate the parse impl
     let fmt_ty = fmt.ty(&error_mod, &ty_gen);
     let fmt_inst = fmt.inst(&error_mod);
     let err_ty = err.ty(&error_mod);
-    res.extend(quote! {
+    quote! {
         #[automatically_derived]
         impl #impl_gen ::ast_toolkit2::nibble::Parsable<::std::primitive::u8> for #ident #ty_gen #where_bounds {
             type Formatter = #fmt_ty;
@@ -522,8 +545,35 @@ pub fn handle_impl(outer_attrs: &[OuterAttr], vis: Visibility, ident: Path, mut 
                 ::std::result::Result::Ok((#inst_impl, rem))
             }
         }
-    });
+    }
+}
+
+
+
+/// Handles the implementation.
+pub fn handle_impl(
+    outer_attrs: &[OuterAttr],
+    vis: Visibility,
+    ident: Ident,
+    constr: Path,
+    gens: Generics,
+    fields: Fields,
+) -> Result<TokenStream2, Error> {
+    // Do some outer attribute processing
+    let error_mod = cook_up_error_mod_name(outer_attrs, &constr);
+
+    // First, analyze each field and remember what we need to keep
+    let struct_ty = StructTy::from(&fields);
+    let fields = fields.into_iter().enumerate().map(FieldInfo::try_from).collect::<Result<Vec<FieldInfo>, Error>>()?;
+
+    // Decide on the formatter & error impls
+    let fmt = FormatterImpl::new(outer_attrs, &fields);
+    let err = ErrorImpl::new(&fields);
+
+    // Generate the mod implementation & main implementation
+    let mod_impl = generate_mod_impl(&error_mod, &vis, &constr, &gens, &fmt, &err);
+    let main_impl = generate_parsable_impl(&error_mod, outer_attrs, &ident, &constr, gens, struct_ty, &fields, &fmt, &err);
 
     // Done
-    Ok(res)
+    Ok(quote! { #mod_impl #main_impl })
 }
