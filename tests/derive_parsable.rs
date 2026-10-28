@@ -18,6 +18,13 @@ pub struct LitIntDot {
     lit: LitInt,
     dot: Dot,
 }
+
+#[derive(Debug, Eq, PartialEq, Parsable)]
+pub struct Tuple(Comma, Dot);
+
+#[derive(Debug, Eq, PartialEq, Parsable)]
+pub struct Empty;
+
 #[derive(Debug, Eq, PartialEq, Parsable)]
 #[parse(expected = "a silly example")]
 pub struct FnDot {
@@ -26,11 +33,28 @@ pub struct FnDot {
 }
 
 #[derive(Debug, Eq, PartialEq, Parsable)]
+pub struct As {
+    #[parse(as = Comma)]
+    dot: Dot,
+}
+
+#[derive(Debug, Eq, PartialEq, Parsable)]
+pub struct Skip {
+    dot:   Dot,
+    #[parse(skip)]
+    extra: String,
+}
+
+
+
+#[derive(Debug, Eq, PartialEq, Parsable)]
 #[parse(lit = "^[0-9]+")]
 pub struct LitInt {
     value: u64,
     loc:   TestLoc,
 }
+
+
 
 #[derive(Debug, Eq, PartialEq, Parsable)]
 #[parse(term = "fn", sep = "[A-Za-z0-9_]")]
@@ -39,9 +63,18 @@ pub struct Fn(TestLoc);
 #[derive(Debug, Eq, PartialEq, Parsable)]
 #[parse(term = ",", whitespace)]
 pub struct Comma(TestLoc);
+impl From<Dot> for Comma {
+    #[inline]
+    fn from(value: Dot) -> Self { Self(value.0) }
+}
+
 #[derive(Debug, Eq, PartialEq, Parsable)]
 #[parse(term = ".")]
 pub struct Dot(TestLoc);
+impl From<Comma> for Dot {
+    #[inline]
+    fn from(value: Comma) -> Self { Self(value.0) }
+}
 
 
 
@@ -108,6 +141,35 @@ fn test_parsable_seq() {
 }
 
 #[test]
+fn test_parsable_seq_tuple() {
+    let input1 = Slice::with_raw_id(0, b",.");
+    let input2 = Slice::with_raw_id(0, b",");
+    let input3 = Slice::with_raw_id(0, b".");
+    let input4 = Slice::with_raw_id(0, b"");
+    assert_eq!(
+        Tuple::parse(input1),
+        Ok((Tuple(Comma(TestLoc::from(Loc::encapsulate_range(0, 0..1))), Dot(TestLoc::from(Loc::encapsulate_range(0, 1..2)))), input1.slice(2..)))
+    );
+    assert_eq!(
+        Tuple::parse(input2),
+        Err(NibbleError::NotEnough(tuple::Formatter { f0: ",", f1: "." }, Needed::Bounded(1, 1), Loc::encapsulate_range(0, 1..1)))
+    );
+    assert_eq!(Tuple::parse(input3), Err(NibbleError::Unmatched(tuple::Formatter { f0: ",", f1: "." }, Loc::encapsulate_range(0, ..1))));
+    assert_eq!(
+        Tuple::parse(input4),
+        Err(NibbleError::NotEnough(tuple::Formatter { f0: ",", f1: "." }, Needed::Bounded(1, 1), Loc::encapsulate_range(0, ())))
+    );
+}
+
+#[test]
+fn test_parsable_seq_empty() {
+    let input1 = Slice::with_raw_id(0, b"abc");
+    let input2 = Slice::with_raw_id(0, b"");
+    assert_eq!(Empty::parse(input1), Ok((Empty, input1)));
+    assert_eq!(Empty::parse(input2), Ok((Empty, input2)));
+}
+
+#[test]
 fn test_parsable_seq_expects() {
     let input1 = Slice::with_raw_id(0, b"fn.");
     let input2 = Slice::with_raw_id(0, b"fn");
@@ -123,6 +185,37 @@ fn test_parsable_seq_expects() {
     assert_eq!(FnDot::parse(input2), Err(NibbleError::NotEnough("a silly example", Needed::Bounded(1, 1), Loc::encapsulate_range(0, 2..2))));
     assert_eq!(FnDot::parse(input3), Err(NibbleError::Unmatched("a silly example", Loc::encapsulate_range(0, ..1))));
     assert_eq!(FnDot::parse(input4), Err(NibbleError::NotEnough("a silly example", Needed::Bounded(2, 2), Loc::encapsulate_range(0, 0..0))));
+}
+
+#[test]
+fn test_parsable_seq_as() {
+    let input1 = Slice::with_raw_id(0, b",");
+    let input2 = Slice::with_raw_id(0, b".");
+    let input3 = Slice::with_raw_id(0, b"fn");
+    let input4 = Slice::with_raw_id(0, b"");
+    assert_eq!(As::parse(input1), Ok((As { dot: Dot(TestLoc::from(Loc::encapsulate_range(0, ..1))) }, input1.slice(1..))));
+    assert_eq!(As::parse(input2), Err(NibbleError::Unmatched(as_tys::Formatter { dot: "," }, Loc::encapsulate_range(0, ..1))));
+    assert_eq!(As::parse(input3), Err(NibbleError::Unmatched(as_tys::Formatter { dot: "," }, Loc::encapsulate_range(0, ..1))));
+    assert_eq!(
+        As::parse(input4),
+        Err(NibbleError::NotEnough(as_tys::Formatter { dot: "," }, Needed::Bounded(1, 1), Loc::encapsulate_range(0, 0..0)))
+    );
+}
+
+#[test]
+fn test_parsable_seq_skip() {
+    let input1 = Slice::with_raw_id(0, b".");
+    let input2 = Slice::with_raw_id(0, b"fn");
+    let input3 = Slice::with_raw_id(0, b"");
+    assert_eq!(
+        Skip::parse(input1),
+        Ok((Skip { dot: Dot(TestLoc::from(Loc::encapsulate_range(0, ..1))), extra: Default::default() }, input1.slice(1..)))
+    );
+    assert_eq!(Skip::parse(input2), Err(NibbleError::Unmatched(skip::Formatter { dot: "." }, Loc::encapsulate_range(0, ..1))));
+    assert_eq!(
+        Skip::parse(input3),
+        Err(NibbleError::NotEnough(skip::Formatter { dot: "." }, Needed::Bounded(1, 1), Loc::encapsulate_range(0, 0..0)))
+    );
 }
 
 #[test]

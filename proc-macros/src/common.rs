@@ -8,7 +8,7 @@
 use proc_macro2::{Punct, Spacing, Span, TokenStream as TokenStream2, TokenTree as TokenTree2};
 use quote::ToTokens;
 use syn::punctuated::Punctuated;
-use syn::{GenericParam, Generics, Ident, Path, PathArguments, PathSegment, TraitBound, TraitBoundModifier, TypeParamBound};
+use syn::{GenericParam, Generics, Ident, Path, PathArguments, PathSegment, TraitBound, TypeParamBound};
 
 
 /***** HELPER *****/
@@ -147,8 +147,9 @@ pub fn inject_trait_bound<const LEN: usize>(path: [&'static str; LEN], gens: &mu
     for param in gens.type_params_mut() {
         param.bounds.push(TypeParamBound::Trait(TraitBound {
             paren_token: None,
-            modifier: TraitBoundModifier::None,
             lifetimes: None,
+            modifiers: Default::default(),
+            maybe: None,
             path: Path {
                 leading_colon: Some(Default::default()),
                 segments:      {

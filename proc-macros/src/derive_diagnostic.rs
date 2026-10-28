@@ -25,6 +25,7 @@ use crate::common::split_for_impl_with_extra;
 #[inline]
 fn default_elemty() -> Type {
     Type::Path(TypePath {
+        attrs: Vec::new(),
         qself: None,
         path:  Path {
             leading_colon: None,
