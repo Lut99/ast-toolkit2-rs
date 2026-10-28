@@ -152,12 +152,12 @@ fn test_parsable_seq_tuple() {
     );
     assert_eq!(
         Tuple::parse(input2),
-        Err(NibbleError::NotEnough(tuple::Formatter { f0: ",", f1: "." }, Needed::Bounded(1, 1), Loc::encapsulate_range(0, 1..1)))
+        Err(NibbleError::NotEnough(tuple::Formatter { field0: ",", field1: "." }, Needed::Bounded(1, 1), Loc::encapsulate_range(0, 1..1)))
     );
-    assert_eq!(Tuple::parse(input3), Err(NibbleError::Unmatched(tuple::Formatter { f0: ",", f1: "." }, Loc::encapsulate_range(0, ..1))));
+    assert_eq!(Tuple::parse(input3), Err(NibbleError::Unmatched(tuple::Formatter { field0: ",", field1: "." }, Loc::encapsulate_range(0, ..1))));
     assert_eq!(
         Tuple::parse(input4),
-        Err(NibbleError::NotEnough(tuple::Formatter { f0: ",", f1: "." }, Needed::Bounded(1, 1), Loc::encapsulate_range(0, ())))
+        Err(NibbleError::NotEnough(tuple::Formatter { field0: ",", field1: "." }, Needed::Bounded(1, 1), Loc::encapsulate_range(0, ())))
     );
 }
 
@@ -194,12 +194,9 @@ fn test_parsable_seq_as() {
     let input3 = Slice::with_raw_id(0, b"fn");
     let input4 = Slice::with_raw_id(0, b"");
     assert_eq!(As::parse(input1), Ok((As { dot: Dot(TestLoc::from(Loc::encapsulate_range(0, ..1))) }, input1.slice(1..))));
-    assert_eq!(As::parse(input2), Err(NibbleError::Unmatched(as_tys::Formatter { dot: "," }, Loc::encapsulate_range(0, ..1))));
-    assert_eq!(As::parse(input3), Err(NibbleError::Unmatched(as_tys::Formatter { dot: "," }, Loc::encapsulate_range(0, ..1))));
-    assert_eq!(
-        As::parse(input4),
-        Err(NibbleError::NotEnough(as_tys::Formatter { dot: "," }, Needed::Bounded(1, 1), Loc::encapsulate_range(0, 0..0)))
-    );
+    assert_eq!(As::parse(input2), Err(NibbleError::Unmatched(",", Loc::encapsulate_range(0, ..1))));
+    assert_eq!(As::parse(input3), Err(NibbleError::Unmatched(",", Loc::encapsulate_range(0, ..1))));
+    assert_eq!(As::parse(input4), Err(NibbleError::NotEnough(",", Needed::Bounded(1, 1), Loc::encapsulate_range(0, 0..0))));
 }
 
 #[test]
@@ -211,11 +208,8 @@ fn test_parsable_seq_skip() {
         Skip::parse(input1),
         Ok((Skip { dot: Dot(TestLoc::from(Loc::encapsulate_range(0, ..1))), extra: Default::default() }, input1.slice(1..)))
     );
-    assert_eq!(Skip::parse(input2), Err(NibbleError::Unmatched(skip::Formatter { dot: "." }, Loc::encapsulate_range(0, ..1))));
-    assert_eq!(
-        Skip::parse(input3),
-        Err(NibbleError::NotEnough(skip::Formatter { dot: "." }, Needed::Bounded(1, 1), Loc::encapsulate_range(0, 0..0)))
-    );
+    assert_eq!(Skip::parse(input2), Err(NibbleError::Unmatched(".", Loc::encapsulate_range(0, ..1))));
+    assert_eq!(Skip::parse(input3), Err(NibbleError::NotEnough(".", Needed::Bounded(1, 1), Loc::encapsulate_range(0, 0..0))));
 }
 
 #[test]
