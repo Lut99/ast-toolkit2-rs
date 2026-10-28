@@ -7,14 +7,14 @@
 
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{ToTokens, quote};
-use syn::{DataStruct, Error, Fields, Generics, Ident, LitStr};
+use syn::{Error, Fields, Generics, Ident, LitStr};
 
 use super::{OuterAttr, whitespace_pop_impl};
 
 
 /***** LIBRARY *****/
 /// Handles the implementation.
-pub fn handle_impl(outer_attrs: &[OuterAttr], tag: &LitStr, ident: Ident, gens: Generics, data: DataStruct) -> Result<TokenStream2, Error> {
+pub fn handle_impl(outer_attrs: &[OuterAttr], tag: &LitStr, ident: &Ident, gens: &Generics, fields: &Fields) -> Result<TokenStream2, Error> {
     // Prepare stuff
     let expects: TokenStream2 = OuterAttr::has_expects(outer_attrs)
         .map(ToTokens::to_token_stream)
@@ -23,18 +23,18 @@ pub fn handle_impl(outer_attrs: &[OuterAttr], tag: &LitStr, ident: Ident, gens: 
     let (impl_gen, ty_gen, where_bounds) = gens.split_for_impl();
 
     // Figure out how to build the terminal
-    let constr: TokenStream2 = match &data.fields {
+    let constr: TokenStream2 = match fields {
         Fields::Named(n) => {
             if n.named.len() == 1 {
                 let ident = n.named.iter().next().unwrap().ident.as_ref().unwrap();
-                quote!(Self { #ident: <_ as ::std::convert::From<::ast_toolkit2::loc::Loc>>::from(loc) })
+                quote!(#ident { #ident: <_ as ::std::convert::From<::ast_toolkit2::loc::Loc>>::from(loc) })
             } else {
                 return Err(Error::new(ident.span(), "Expected one `Loc`-field to put the parsed range in"));
             }
         },
         Fields::Unnamed(u) => {
             if u.unnamed.len() == 1 {
-                quote!(Self(<_ as ::std::convert::From<::ast_toolkit2::loc::Loc>>::from(loc)))
+                quote!(#ident(<_ as ::std::convert::From<::ast_toolkit2::loc::Loc>>::from(loc)))
             } else {
                 return Err(Error::new(ident.span(), "Expected exactly one `Loc`-field to put the parsed range in"));
             }

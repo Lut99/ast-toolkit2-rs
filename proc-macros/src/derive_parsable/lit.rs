@@ -8,14 +8,14 @@
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{ToTokens, quote};
 use syn::spanned::Spanned as _;
-use syn::{DataStruct, Error, Fields, Generics, Ident, LitStr, Type};
+use syn::{Error, Fields, Generics, Ident, LitStr, Type};
 
 use super::{OuterAttr, whitespace_pop_impl};
 
 
 /***** LIBRARY *****/
 /// Handles the implementation.
-pub fn handle_impl(outer_attrs: &[OuterAttr], regex: &LitStr, ident: Ident, gens: Generics, data: DataStruct) -> Result<TokenStream2, Error> {
+pub fn handle_impl(outer_attrs: &[OuterAttr], regex: &LitStr, ident: &Ident, gens: &Generics, fields: &Fields) -> Result<TokenStream2, Error> {
     // Prepare stuff
     let expects: TokenStream2 = OuterAttr::has_expects(outer_attrs)
         .map(ToTokens::to_token_stream)
@@ -24,21 +24,24 @@ pub fn handle_impl(outer_attrs: &[OuterAttr], regex: &LitStr, ident: Ident, gens
     let (impl_gen, ty_gen, where_bounds) = gens.split_for_impl();
 
     // Search for the type of the 'value' field
-    let value_ty: Type = match data.fields {
+    let (constr, value_ty): (TokenStream2, &Type) = match fields {
         Fields::Named(n) => {
             let n_span = n.span();
             if n.named.len() != 2 {
                 return Err(Error::new(n_span, "Expected two fields, a `value` and a `loc`-field"));
             }
-            n.named.into_iter().find(|f| f.ident.as_ref().unwrap() == "value").ok_or_else(|| Error::new(n_span, "Missing `value`-field"))?.ty
+            (
+                quote! { #ident { value, loc } },
+                &n.named.iter().find(|f| f.ident.as_ref().unwrap() == "value").ok_or_else(|| Error::new(n_span, "Missing `value`-field"))?.ty,
+            )
         },
         Fields::Unnamed(u) => {
             if u.unnamed.len() != 2 {
                 return Err(Error::new(u.span(), "Expected two fields, a `value` and a `loc`-field"));
             }
-            u.unnamed.into_iter().nth(1).unwrap().ty
+            (quote! { #ident(value, loc) }, &u.unnamed.iter().nth(1).unwrap().ty)
         },
-        Fields::Unit => return Err(Error::new(data.fields.span(), "Expected two fields, a `value` and a `loc`-field")),
+        Fields::Unit => return Err(Error::new(fields.span(), "Expected two fields, a `value` and a `loc`-field")),
     };
 
     // Generate the impl
@@ -66,7 +69,10 @@ pub fn handle_impl(outer_attrs: &[OuterAttr], regex: &LitStr, ident: Ident, gens
                 let error_loc = ::ast_toolkit2::nibble::Slice::error_loc(&input);
                 match Regex::find(regex, ::ast_toolkit2::nibble::Slice::as_slice(&input)) {
                     ::std::option::Option::Some(m) => match ::ast_toolkit2::nibble::Convert::try_parse(Match::as_bytes(&m)) {
-                        Ok(value) => ::std::result::Result::Ok((Self { value, loc: ::std::convert::From::from(::ast_toolkit2::loc::Loc { source: error_loc.source, range: ::std::convert::From::from(Match::range(&m)) }) }, ::ast_toolkit2::nibble::Slice::slice(input, Match::end(&m)..))),
+                        Ok(value) => {
+                            let loc = ::std::convert::From::from(::ast_toolkit2::loc::Loc { source: error_loc.source, range: ::std::convert::From::from(Match::range(&m)) });
+                            ::std::result::Result::Ok((#constr, ::ast_toolkit2::nibble::Slice::slice(input, Match::end(&m)..)))
+                        },
                         Err(err) => ::std::result::Result::Err(::ast_toolkit2::nibble::error::NibbleError::Error(err)),
                     },
                     ::std::option::Option::None => ::std::result::Result::Err(::ast_toolkit2::nibble::error::NibbleError::Unmatched(#expects, error_loc))

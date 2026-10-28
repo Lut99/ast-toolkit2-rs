@@ -363,19 +363,54 @@ impl Parse for OuterAttr {
 
 
 /// Defines- and parses variant attributes.
+#[derive(Debug)]
 enum VariantAttr {
+    /// Parses another type, then uses from to turn A into B.
+    As { other: Type },
+    /// Represents a custom expects string.
+    Expects { what: LitStr },
     /// It's to skip.
     Skip,
+    /// Parses another type, then uses try_from to turn A into B.
+    TryAs { other: Type },
 }
 
 // Checking
 impl VariantAttr {
     #[inline]
+    fn has_as(attrs: &[Self]) -> Option<&Type> {
+        attrs.iter().find_map(|a| match a {
+            Self::As { other } => Some(other),
+            _ => None,
+        })
+    }
+    #[inline]
+    fn has_expects(attrs: &[Self]) -> Option<&LitStr> {
+        attrs.iter().find_map(|a| match a {
+            Self::Expects { what } => Some(what),
+            _ => None,
+        })
+    }
+    #[inline]
     fn has_skip(attrs: &[Self]) -> bool { attrs.iter().any(|a| matches!(a, Self::Skip)) }
+    #[inline]
+    fn has_try_as(attrs: &[Self]) -> Option<&Type> {
+        attrs.iter().find_map(|a| match a {
+            Self::TryAs { other } => Some(other),
+            _ => None,
+        })
+    }
 }
 impl Attr for VariantAttr {
-    #[inline]
-    fn check_consistency(_attrs: &[Self]) -> Result<(), Error> { Ok(()) }
+    /// Check if the list of attributes makes sense.
+    fn check_consistency(attrs: &[Self]) -> Result<(), Error> {
+        if let Some(a) = Self::has_as(attrs)
+            && Self::has_try_as(attrs).is_some()
+        {
+            return Err(Error::new(a.span(), "`as` and `try_as` are mutually exclusive"));
+        }
+        Ok(())
+    }
 }
 
 // Parsing
@@ -383,32 +418,20 @@ impl Parse for VariantAttr {
     fn parse(input: ParseStream) -> Result<Self, Error> {
         // The stream must begin with an identifier
         let ident: Ident = Ident::parse_any(input)?;
-        if ident == "skip" { Ok(Self::Skip) } else { Err(Error::new(ident.span(), &format!("Unknown `parse` variant attribute {ident:?}"))) }
-    }
-}
-
-
-
-/// Either an [`OuterAttr`] or a [`VariantAttr`].
-enum OuterOrVariantAttr {
-    Outer(OuterAttr),
-    Variant(VariantAttr),
-}
-
-// Checking
-impl Attr for OuterOrVariantAttr {
-    #[inline]
-    fn check_consistency(_attrs: &[Self]) -> Result<(), Error> { Ok(()) }
-}
-
-// Parsing
-impl Parse for OuterOrVariantAttr {
-    #[inline]
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        OuterAttr::parse(input)
-            .map(Self::Outer)
-            .or_else(|_| VariantAttr::parse(input).map(Self::Variant))
-            .map_err(|err| Error::new(err.span(), "Unknown `parse` outer- or variant attribute"))
+        if ident == "as" {
+            input.parse::<Token![=]>()?;
+            Ok(Self::As { other: input.parse()? })
+        } else if ident == "expects" || ident == "expected" {
+            input.parse::<Token![=]>()?;
+            Ok(Self::Expects { what: input.parse()? })
+        } else if ident == "skip" {
+            Ok(Self::Skip)
+        } else if ident == "try_as" {
+            input.parse::<Token![=]>()?;
+            Ok(Self::TryAs { other: input.parse()? })
+        } else {
+            Err(Error::new(ident.span(), &format!("Unknown `parse` variant attribute {ident:?}")))
+        }
     }
 }
 
@@ -497,35 +520,15 @@ pub fn handle(item: TokenStream2) -> Result<TokenStream2, Error> {
     // Handle each one individually
     match data {
         Data::Struct(s) => {
-            if let Some(tag) = attrs.iter().find_map(|a| match a {
-                OuterAttr::Term { tag } => Some(tag),
-                _ => None,
-            }) {
+            if let Some(tag) = OuterAttr::has_term(&attrs) {
                 // Handle as a keyword token
-                term::handle_impl(&attrs, tag, ident, generics, s)
-            } else if let Some(regex) = attrs.iter().find_map(|a| match a {
-                OuterAttr::Lit { regex } => Some(regex),
-                _ => None,
-            }) {
-                // Handle as a keyword token
-                lit::handle_impl(&attrs, regex, ident, generics, s)
+                term::handle_impl(&attrs, tag, &ident, &generics, &s.fields)
+            } else if let Some(regex) = OuterAttr::has_lit(&attrs) {
+                // Handle as a literal token
+                lit::handle_impl(&attrs, regex, &ident, &generics, &s.fields)
             } else {
                 // Handle as a sequence
-                seq::handle_impl(
-                    &attrs,
-                    vis,
-                    ident.clone(),
-                    Path {
-                        leading_colon: None,
-                        segments:      {
-                            let mut segs = Punctuated::new();
-                            segs.push(PathSegment { ident, arguments: PathArguments::None });
-                            segs
-                        },
-                    },
-                    generics,
-                    s.fields,
-                )
+                seq::handle_impl(&attrs, vis, ident, generics, s.fields)
             }
         },
         Data::Enum(e) => {

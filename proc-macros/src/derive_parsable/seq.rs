@@ -5,39 +5,29 @@
 //!   Implements the logic for structs, i.e., sequential parsers.
 //
 
-use std::collections::HashMap;
-
 use convert_case::{Case, Casing as _};
 use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::{ToTokens, quote};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned as _;
-use syn::{Error, Field, Fields, Generics, Ident, LitStr, Path, Token, Type, TypeGenerics, Visibility};
+use syn::{Error, Field, Fields, Generics, Ident, LitStr, Token, Type, TypeGenerics, Visibility};
 
 use super::{FieldAttr, OuterAttr, inject_parsable_bound, parse_parse_attrs, whitespace_pop_impl};
 
 
 /***** HELPER FUNCTIONS *****/
-pub fn cook_up_error_mod_name(attrs: &[OuterAttr], ident: &Path) -> Ident {
+pub fn cook_up_error_mod_name(attrs: &[OuterAttr], ident: &Ident) -> Ident {
     // Check: did the user tell us?
     if let Some(name) = OuterAttr::has_mod(attrs) {
         return name.clone();
     }
 
     // Generate an identifier name
-    let mut name = String::new();
-    for seg in &ident.segments {
-        // We do the whole business with parsing to make sure that we don't accidentally create a keyword
-        let error_mod_name = seg.ident.to_string().to_case(Case::Snake);
-        let error_mod_name = if syn::parse_str::<Ident>(&error_mod_name).is_ok() { error_mod_name } else { format!("{error_mod_name}_tys") };
-        if !name.is_empty() {
-            name.push('_');
-        }
-        name.push_str(&error_mod_name);
-    }
+    let error_mod_name = ident.to_string().to_case(Case::Snake);
+    let error_mod_name = if syn::parse_str::<Ident>(&error_mod_name).is_ok() { error_mod_name } else { format!("{error_mod_name}_tys") };
 
     // Done, create identifier out of it
-    Ident::new(&name, ident.span())
+    Ident::new(&error_mod_name, ident.span())
 }
 
 
@@ -147,22 +137,18 @@ impl<'a> FormatterImpl<'a> {
 
 
     /// Returns a generator for the type declaration of this FormatterImpl.
-    fn def<'s, 'g>(&self, ident: &'s Path, gens: &'g Generics) -> FormatterImplDef<'s, 'g, '_, 'a> { FormatterImplDef(ident, gens, self) }
+    fn def<'s, 'g>(&self, ident: &'s Ident, gens: &'g Generics) -> FormatterImplDef<'s, 'g, '_, 'a> { FormatterImplDef(ident, gens, self) }
 
     /// Returns a generator for the typename for the formatter's type.
-    fn ty<'e, 't, 'g>(&self, error_mod: &'e Ident, ty_gen: &'t TypeGenerics<'g>) -> FormatterImplTy<'e, 't, 'g, '_, 'a> {
+    pub fn ty<'e, 't, 'g>(&self, error_mod: &'e Ident, ty_gen: &'t TypeGenerics<'g>) -> FormatterImplTy<'e, 't, 'g, '_, 'a> {
         FormatterImplTy(error_mod, ty_gen, self)
     }
 
     /// Returns a generator for the instantiation of whatever type this FormatterImpl is.
     fn inst<'e>(&self, error_mod: &'e Ident) -> FormatterImplInst<'e, '_, 'a> { FormatterImplInst(error_mod, self) }
-
-
-    /// Returns a map describing the new formatters generated.
-    pub fn generated_map(&self, error_mod: &Ident) -> HashMap<String, Path> { HashMap::new() }
 }
 
-struct FormatterImplDef<'i, 'g, 's, 'a>(&'i Path, &'g Generics, &'s FormatterImpl<'a>);
+struct FormatterImplDef<'i, 'g, 's, 'a>(&'i Ident, &'g Generics, &'s FormatterImpl<'a>);
 impl<'i, 'g, 's, 'a> ToTokens for FormatterImplDef<'i, 'g, 's, 'a> {
     #[inline]
     fn to_tokens(&self, tokens: &mut TokenStream2) {
@@ -217,7 +203,7 @@ impl<'i, 'g, 's, 'a> ToTokens for FormatterImplDef<'i, 'g, 's, 'a> {
     }
 }
 
-struct FormatterImplTy<'e, 't, 'g, 's, 'a>(&'e Ident, &'t TypeGenerics<'g>, &'s FormatterImpl<'a>);
+pub struct FormatterImplTy<'e, 't, 'g, 's, 'a>(&'e Ident, &'t TypeGenerics<'g>, &'s FormatterImpl<'a>);
 impl<'e, 't, 'g, 's, 'a> ToTokens for FormatterImplTy<'e, 't, 'g, 's, 'a> {
     #[inline]
     fn to_tokens(&self, tokens: &mut TokenStream2) {
@@ -251,10 +237,11 @@ impl<'e, 's, 't> ToTokens for FormatterImplInst<'e, 's, 't> {
                 tokens.extend(quote! { <#ty as ::ast_toolkit2::nibble::Parsable<::std::primitive::u8>>::expects() });
             },
 
-            FormatterImpl::Generated(fmt) => {
+            FormatterImpl::Generated(fields) => {
                 let error_mod = self.0;
-                let fmt_inst: TokenStream2 = fmt
+                let fmt_inst: TokenStream2 = fields
                     .into_iter()
+                    .filter(|f| !f.skip)
                     .map(|field| {
                         let name = &field.name;
                         let ty = field.parsed_ty();
@@ -298,13 +285,15 @@ impl<'a> ErrorImpl<'a> {
 
 
     /// Returns a generator for the type declaration of this ErrorImpl.
-    fn def<'i, 'g>(&self, ident: &'i Path, gens: &'g Generics) -> ErrorImplDef<'i, 'g, '_, 'a> { ErrorImplDef(ident, gens, self) }
+    fn def<'i, 'g>(&self, ident: &'i Ident, gens: &'g Generics) -> ErrorImplDef<'i, 'g, '_, 'a> { ErrorImplDef(ident, gens, self) }
 
     /// Returns a generator for the typename for the formatter's type.
-    fn ty<'e>(&self, error_mod: &'e Ident) -> ErrorImplTy<'e, '_, 'a> { ErrorImplTy(error_mod, self) }
+    pub fn ty<'e, 't, 'g>(&self, error_mod: &'e Ident, ty_gen: &'t TypeGenerics<'g>) -> ErrorImplTy<'e, 't, 'g, '_, 'a> {
+        ErrorImplTy(error_mod, ty_gen, self)
+    }
 }
 
-struct ErrorImplDef<'i, 'g, 's, 'a>(&'i Path, &'g Generics, &'s ErrorImpl<'a>);
+struct ErrorImplDef<'i, 'g, 's, 'a>(&'i Ident, &'g Generics, &'s ErrorImpl<'a>);
 impl<'i, 'g, 's, 'a> ToTokens for ErrorImplDef<'i, 'g, 's, 'a> {
     #[inline]
     fn to_tokens(&self, tokens: &mut TokenStream2) {
@@ -391,14 +380,15 @@ impl<'i, 'g, 's, 'a> ToTokens for ErrorImplDef<'i, 'g, 's, 'a> {
     }
 }
 
-struct ErrorImplTy<'e, 's, 'a>(&'e Ident, &'s ErrorImpl<'a>);
-impl<'e, 's, 'a> ToTokens for ErrorImplTy<'e, 's, 'a> {
+pub struct ErrorImplTy<'e, 't, 'g, 's, 'a>(&'e Ident, &'t TypeGenerics<'g>, &'s ErrorImpl<'a>);
+impl<'e, 't, 'g, 's, 'a> ToTokens for ErrorImplTy<'e, 't, 'g, 's, 'a> {
     #[inline]
     fn to_tokens(&self, tokens: &mut TokenStream2) {
-        match self.1 {
+        match self.2 {
             ErrorImpl::Generated(_) => {
                 let error_mod = self.0;
-                tokens.extend(quote! { #error_mod::Error })
+                let ty_gen = self.1;
+                tokens.extend(quote! { #error_mod::Error #ty_gen })
             },
             ErrorImpl::Single(field) => {
                 let ty = field.parsed_ty();
@@ -415,13 +405,13 @@ impl<'e, 's, 'a> ToTokens for ErrorImplTy<'e, 's, 'a> {
 
 /***** LIBRARY *****/
 /// Generates an implementation for the module, i.e., auxillary types.
-pub fn generate_mod_impl(error_mod: &Ident, vis: &Visibility, constr: &Path, gens: &Generics, fmt: &FormatterImpl, err: &ErrorImpl) -> TokenStream2 {
+pub fn generate_mod_impl(error_mod: &Ident, vis: &Visibility, ident: &Ident, gens: &Generics, fmt: &FormatterImpl, err: &ErrorImpl) -> TokenStream2 {
     // Generate the module impl
     if matches!(fmt, FormatterImpl::Generated(_)) || matches!(err, ErrorImpl::Generated(_)) {
-        let fmt_def = fmt.def(&constr, &gens);
-        let err_def = err.def(&constr, &gens);
+        let fmt_def = fmt.def(&ident, &gens);
+        let err_def = err.def(&ident, &gens);
         quote! {
-            #[doc = ::std::concat!("Helper module for [`", ::std::stringify!(#constr), "`] containing auxillary types.")]
+            #[doc = ::std::concat!("Helper module for [`", ::std::stringify!(#ident), "`] containing auxillary types.")]
             #vis mod #error_mod {
                 use super::*;
 
@@ -440,7 +430,6 @@ pub fn generate_parsable_impl(
     error_mod: &Ident,
     outer_attrs: &[OuterAttr],
     ident: &Ident,
-    constr: &Path,
     mut gens: Generics,
     struct_ty: StructTy,
     fields: &[FieldInfo],
@@ -509,9 +498,9 @@ pub fn generate_parsable_impl(
     // Generate the instantiation at the end of the parse
     let inst_impl: Punctuated<TokenStream2, Token![,]> = fields.iter().map(|field| field.name.to_token_stream()).collect();
     let inst_impl = match struct_ty {
-        StructTy::Named => quote! { #constr { #inst_impl } },
-        StructTy::Unnamed => quote! { #constr(#inst_impl) },
-        StructTy::Unit => quote! { #constr },
+        StructTy::Named => quote! { #ident { #inst_impl } },
+        StructTy::Unnamed => quote! { #ident(#inst_impl) },
+        StructTy::Unit => quote! { #ident },
     };
 
     // Prepare generics by inserting the bound
@@ -521,7 +510,7 @@ pub fn generate_parsable_impl(
     // Generate the parse impl
     let fmt_ty = fmt.ty(&error_mod, &ty_gen);
     let fmt_inst = fmt.inst(&error_mod);
-    let err_ty = err.ty(&error_mod);
+    let err_ty = err.ty(&error_mod, &ty_gen);
     quote! {
         #[automatically_derived]
         impl #impl_gen ::ast_toolkit2::nibble::Parsable<::std::primitive::u8> for #ident #ty_gen #where_bounds {
@@ -551,16 +540,9 @@ pub fn generate_parsable_impl(
 
 
 /// Handles the implementation.
-pub fn handle_impl(
-    outer_attrs: &[OuterAttr],
-    vis: Visibility,
-    ident: Ident,
-    constr: Path,
-    gens: Generics,
-    fields: Fields,
-) -> Result<TokenStream2, Error> {
+pub fn handle_impl(outer_attrs: &[OuterAttr], vis: Visibility, ident: Ident, gens: Generics, fields: Fields) -> Result<TokenStream2, Error> {
     // Do some outer attribute processing
-    let error_mod = cook_up_error_mod_name(outer_attrs, &constr);
+    let error_mod = cook_up_error_mod_name(outer_attrs, &ident);
 
     // First, analyze each field and remember what we need to keep
     let struct_ty = StructTy::from(&fields);
@@ -571,8 +553,8 @@ pub fn handle_impl(
     let err = ErrorImpl::new(&fields);
 
     // Generate the mod implementation & main implementation
-    let mod_impl = generate_mod_impl(&error_mod, &vis, &constr, &gens, &fmt, &err);
-    let main_impl = generate_parsable_impl(&error_mod, outer_attrs, &ident, &constr, gens, struct_ty, &fields, &fmt, &err);
+    let mod_impl = generate_mod_impl(&error_mod, &vis, &ident, &gens, &fmt, &err);
+    let main_impl = generate_parsable_impl(&error_mod, outer_attrs, &ident, gens, struct_ty, &fields, &fmt, &err);
 
     // Done
     Ok(quote! { #mod_impl #main_impl })
