@@ -29,7 +29,7 @@ impl<'f, 'a> ToTokens for ErrDef<'f, 'a> {
             .into_iter()
             .map(|info| {
                 let name = &info.var_name;
-                let ty = info.parsed_ty;
+                let ty = &info.parsed_ty;
                 if !info.skip {
                     // Normal implementation; refer to the parser's Formatter type.
                     let mut res = quote! { #name(<#ty as ::ast_toolkit2::nibble::Parsable<::std::primitive::u8>>::Error), };
@@ -209,7 +209,7 @@ pub struct ErrInfo<'a> {
     /// The type of the nested parser.
     ///
     /// Note that this is the parsed type; we're looking after `as` and such.
-    pub parsed_ty: &'a Type,
+    pub parsed_ty: Type,
     /// Whether the parser is converting fallibly using `TryAs`. If so, will need an additional
     /// error enum variant.
     ///
@@ -231,7 +231,7 @@ impl<'a> ErrInfo<'a> {
     /// - `target_ty`: If given, indicates that there is `TryAs`-shenanigans going on and that this is
     ///   the converted-to type. This automatically makes `parsed_ty` the converted-from type.
     /// - `skip`: Whether the subparser should be skipped or not.
-    pub fn new(name: &Ident, parsed_ty: &'a Type, target_ty: Option<&'a Type>, skip: bool) -> Self {
+    pub fn new(name: &Ident, parsed_ty: Type, target_ty: Option<&'a Type>, skip: bool) -> Self {
         let camel_name = name.to_string().to_case(Case::Pascal);
         Self {
             var_name: Ident::new(&camel_name, name.span()),

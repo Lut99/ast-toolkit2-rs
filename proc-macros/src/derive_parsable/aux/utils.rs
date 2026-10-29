@@ -12,7 +12,7 @@ use syn::{
     AngleBracketedGenericArguments, GenericArgument, Generics, Ident, Path, PathArguments, PathSegment, TraitBound, Type, TypeParamBound, TypePath,
 };
 
-use super::super::OuterAttr;
+use super::super::OuterAttribute;
 
 
 /***** LIBRARY *****/
@@ -94,9 +94,9 @@ pub fn inject_parsable_bound(gens: &mut Generics) {
 /// # Returns
 /// The "init" implementation, compiling and setting up the regex; and the implementation doing a
 /// pop on a variable called `input`.
-pub fn whitespace_pop_impl(input: &'static str, attrs: &[OuterAttr]) -> (TokenStream2, TokenStream2) {
+pub fn whitespace_pop_impl<A: OuterAttribute>(input: &'static str, attrs: &[A]) -> (TokenStream2, TokenStream2) {
     let input = Ident::new(input, Span::call_site());
-    let whitespace_init = OuterAttr::has_whitespace(attrs)
+    let whitespace_init = OuterAttribute::has_whitespace(attrs)
         .map(|r| match r {
             // Use the given regular expression
             Some(regex) => quote! {

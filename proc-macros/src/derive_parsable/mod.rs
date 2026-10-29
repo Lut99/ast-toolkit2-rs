@@ -19,12 +19,12 @@ use syn::ext::IdentExt;
 use syn::parse::{Parse, ParseStream, Parser as _};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned as _;
-use syn::{Attribute, Data, DataUnion, DeriveInput, Error, Generics, Ident, LitStr, Meta, Token, Type};
+use syn::{Data, DataUnion, DeriveInput, Error, Generics, Ident, LitStr, Meta, Token, Type};
 
 
 /***** HELPER FUNCTIONS *****/
 /// Parses the first `#[parse(...)]`-attribute layer away.
-fn parse_parse_attrs<A: Attr>(attrs: &[Attribute]) -> Result<Vec<A>, Error> {
+fn parse_parse_attrs<A: Attribute>(attrs: &[syn::Attribute]) -> Result<Vec<A>, Error> {
     let mut res = Vec::new();
     for attr in attrs {
         match &attr.meta {
@@ -108,8 +108,18 @@ fn generate_try_as_impl(ident: &Ident, gens: &Generics, other: &Type) -> TokenSt
 
 
 /***** HELPERS *****/
-trait Attr: Parse {
+trait Attribute: Parse {
     fn check_consistency(attrs: &[Self]) -> Result<(), Error>;
+}
+trait OuterAttribute: Attribute {
+    fn has_as(attrs: &[Self]) -> Option<&Type>;
+    fn has_expects(attrs: &[Self]) -> Option<&LitStr>;
+    fn has_lit(attrs: &[Self]) -> Option<&LitStr>;
+    fn has_mod(attrs: &[Self]) -> Option<&Ident>;
+    fn has_sep_check(attrs: &[Self]) -> Option<&LitStr>;
+    fn has_term(attrs: &[Self]) -> Option<&LitStr>;
+    fn has_try_as(attrs: &[Self]) -> Option<&Type>;
+    fn has_whitespace(attrs: &[Self]) -> Option<&Option<LitStr>>;
 }
 
 
@@ -135,65 +145,65 @@ enum OuterAttr {
 }
 
 // Checking
-impl OuterAttr {
+impl OuterAttribute for OuterAttr {
     #[inline]
     fn has_as(attrs: &[Self]) -> Option<&Type> {
         attrs.iter().find_map(|a| match a {
-            OuterAttr::As { other } => Some(other),
+            Self::As { other } => Some(other),
             _ => None,
         })
     }
     #[inline]
     fn has_expects(attrs: &[Self]) -> Option<&LitStr> {
         attrs.iter().find_map(|a| match a {
-            OuterAttr::Expects { what } => Some(what),
+            Self::Expects { what } => Some(what),
             _ => None,
         })
     }
     #[inline]
     fn has_lit(attrs: &[Self]) -> Option<&LitStr> {
         attrs.iter().find_map(|a| match a {
-            OuterAttr::Lit { regex } => Some(regex),
+            Self::Lit { regex } => Some(regex),
             _ => None,
         })
     }
     #[inline]
     fn has_mod(attrs: &[Self]) -> Option<&Ident> {
         attrs.iter().find_map(|a| match a {
-            OuterAttr::Mod { name } => Some(name),
+            Self::Mod { name } => Some(name),
             _ => None,
         })
     }
     #[inline]
     fn has_sep_check(attrs: &[Self]) -> Option<&LitStr> {
         attrs.iter().find_map(|a| match a {
-            OuterAttr::SepCheck { regex } => Some(regex),
+            Self::SepCheck { regex } => Some(regex),
             _ => None,
         })
     }
     #[inline]
     fn has_term(attrs: &[Self]) -> Option<&LitStr> {
         attrs.iter().find_map(|a| match a {
-            OuterAttr::Term { tag } => Some(tag),
+            Self::Term { tag } => Some(tag),
             _ => None,
         })
     }
     #[inline]
     fn has_try_as(attrs: &[Self]) -> Option<&Type> {
         attrs.iter().find_map(|a| match a {
-            OuterAttr::TryAs { other } => Some(other),
+            Self::TryAs { other } => Some(other),
             _ => None,
         })
     }
     #[inline]
     fn has_whitespace(attrs: &[Self]) -> Option<&Option<LitStr>> {
         attrs.iter().find_map(|a| match a {
-            OuterAttr::Whitespace { regex } => Some(regex),
+            Self::Whitespace { regex } => Some(regex),
             _ => None,
         })
     }
 }
-impl Attr for OuterAttr {
+impl Attribute for OuterAttr {
     /// Check if the list of attributes makes sense.
     fn check_consistency(attrs: &[Self]) -> Result<(), Error> {
         if let Some(a) = Self::has_as(attrs)
@@ -269,25 +279,30 @@ impl Parse for OuterAttr {
 
 /// Defines- and parses variant attributes.
 enum VariantAttr {
-    /// Parses another type, then uses from to turn A into B.
-    As { other: Type },
     /// Represents a custom expects string.
     Expects { what: LitStr },
+    /// Represents that the struct is a literal.
+    Lit { regex: LitStr },
+    /// Defines the name to use for the resulting module.
+    Mod { name: Ident },
+    /// Represents that we check that a token is not continued by...
+    SepCheck { regex: LitStr },
     /// It's to skip.
     Skip,
-    /// Parses another type, then uses try_from to turn A into B.
-    TryAs { other: Type },
+    /// Represents that the struct is a terminal.
+    Term { tag: LitStr },
+    /// Adds additional parsers accepting any whitespace.
+    Whitespace { regex: Option<LitStr> },
 }
 
 // Checking
 impl VariantAttr {
     #[inline]
-    fn has_as(attrs: &[Self]) -> Option<&Type> {
-        attrs.iter().find_map(|a| match a {
-            Self::As { other } => Some(other),
-            _ => None,
-        })
-    }
+    fn has_skip(attrs: &[Self]) -> bool { attrs.iter().any(|a| matches!(a, Self::Skip)) }
+}
+impl OuterAttribute for VariantAttr {
+    #[inline]
+    fn has_as(_attrs: &[Self]) -> Option<&Type> { None }
     #[inline]
     fn has_expects(attrs: &[Self]) -> Option<&LitStr> {
         attrs.iter().find_map(|a| match a {
@@ -296,22 +311,60 @@ impl VariantAttr {
         })
     }
     #[inline]
-    fn has_skip(attrs: &[Self]) -> bool { attrs.iter().any(|a| matches!(a, Self::Skip)) }
-    #[inline]
-    fn has_try_as(attrs: &[Self]) -> Option<&Type> {
+    fn has_lit(attrs: &[Self]) -> Option<&LitStr> {
         attrs.iter().find_map(|a| match a {
-            Self::TryAs { other } => Some(other),
+            Self::Lit { regex } => Some(regex),
+            _ => None,
+        })
+    }
+    #[inline]
+    fn has_mod(attrs: &[Self]) -> Option<&Ident> {
+        attrs.iter().find_map(|a| match a {
+            Self::Mod { name } => Some(name),
+            _ => None,
+        })
+    }
+    #[inline]
+    fn has_sep_check(attrs: &[Self]) -> Option<&LitStr> {
+        attrs.iter().find_map(|a| match a {
+            Self::SepCheck { regex } => Some(regex),
+            _ => None,
+        })
+    }
+    #[inline]
+    fn has_term(attrs: &[Self]) -> Option<&LitStr> {
+        attrs.iter().find_map(|a| match a {
+            Self::Term { tag } => Some(tag),
+            _ => None,
+        })
+    }
+    #[inline]
+    fn has_try_as(_attrs: &[Self]) -> Option<&Type> { None }
+    #[inline]
+    fn has_whitespace(attrs: &[Self]) -> Option<&Option<LitStr>> {
+        attrs.iter().find_map(|a| match a {
+            Self::Whitespace { regex } => Some(regex),
             _ => None,
         })
     }
 }
-impl Attr for VariantAttr {
+impl Attribute for VariantAttr {
     /// Check if the list of attributes makes sense.
     fn check_consistency(attrs: &[Self]) -> Result<(), Error> {
-        if let Some(a) = Self::has_as(attrs)
-            && Self::has_try_as(attrs).is_some()
+        if let Some(lit) = Self::has_lit(attrs)
+            && Self::has_term(attrs).is_some()
         {
-            return Err(Error::new(a.span(), "`as` and `try_as` are mutually exclusive"));
+            return Err(Error::new(lit.span(), "`lit` and `term` are mutually exclusive"));
+        }
+        if let Some(lit) = Self::has_sep_check(attrs)
+            && Self::has_term(attrs).is_none()
+        {
+            return Err(Error::new(lit.span(), "`sep` can only be used with `term`"));
+        }
+        if let Some(md) = Self::has_mod(attrs)
+            && (Self::has_term(attrs).is_some() || Self::has_lit(attrs).is_some())
+        {
+            return Err(Error::new(md.span(), "`mod` can only be used without `term` or `sep`"));
         }
         Ok(())
     }
@@ -322,19 +375,28 @@ impl Parse for VariantAttr {
     fn parse(input: ParseStream) -> Result<Self, Error> {
         // The stream must begin with an identifier
         let ident: Ident = Ident::parse_any(input)?;
-        if ident == "as" {
-            input.parse::<Token![=]>()?;
-            Ok(Self::As { other: input.parse()? })
-        } else if ident == "expects" || ident == "expected" {
+        if ident == "expects" || ident == "expected" {
             input.parse::<Token![=]>()?;
             Ok(Self::Expects { what: input.parse()? })
+        } else if ident == "lit" || ident == "literal" {
+            input.parse::<Token![=]>()?;
+            Ok(Self::Lit { regex: input.parse()? })
+        } else if ident == "mod" || ident == "module" {
+            input.parse::<Token![=]>()?;
+            Ok(Self::Mod { name: input.parse()? })
+        } else if ident == "term" || ident == "terminal" {
+            input.parse::<Token![=]>()?;
+            Ok(Self::Term { tag: input.parse()? })
+        } else if ident == "sep" || ident == "sep_check" {
+            input.parse::<Token![=]>()?;
+            Ok(Self::SepCheck { regex: input.parse()? })
         } else if ident == "skip" {
             Ok(Self::Skip)
-        } else if ident == "try_as" {
-            input.parse::<Token![=]>()?;
-            Ok(Self::TryAs { other: input.parse()? })
+        } else if ident == "whitespace" {
+            let regex = if input.parse::<Token![=]>().is_ok() { Some(input.parse()?) } else { None };
+            Ok(Self::Whitespace { regex })
         } else {
-            Err(Error::new(ident.span(), &format!("Unknown `parse` variant attribute {ident:?}")))
+            Err(Error::new(ident.span(), &format!("Unknown `parse` variant attribute {:?}", ident.to_string())))
         }
     }
 }
@@ -371,7 +433,7 @@ impl FieldAttr {
     #[inline]
     fn has_skip(attrs: &[Self]) -> bool { attrs.iter().find(|a| matches!(a, Self::Skip)).is_some() }
 }
-impl Attr for FieldAttr {
+impl Attribute for FieldAttr {
     /// Check if the list of attributes makes sense.
     fn check_consistency(attrs: &[Self]) -> Result<(), Error> {
         if let Some(other) = Self::has_as(attrs)

@@ -13,14 +13,14 @@ use syn::spanned::Spanned as _;
 use syn::{Error, Field, Fields, Generics, Ident, Token, Type, Visibility};
 
 use super::aux::{Fmt, FmtInfo, identity_path, inject_parsable_bound, whitespace_pop_impl};
-use super::{FieldAttr, OuterAttr, parse_parse_attrs};
+use super::{FieldAttr, OuterAttr, OuterAttribute, parse_parse_attrs};
 use crate::derive_parsable::aux::{Err, ErrInfo};
 
 
 /***** HELPER FUNCTIONS *****/
-pub fn cook_up_error_mod_name(attrs: &[OuterAttr], ident: &Ident) -> Ident {
+pub fn cook_up_error_mod_name<A: OuterAttribute>(attrs: &[A], ident: &Ident) -> Ident {
     // Check: did the user tell us?
-    if let Some(name) = OuterAttr::has_mod(attrs) {
+    if let Some(name) = OuterAttribute::has_mod(attrs) {
         return name.clone();
     }
 
@@ -89,13 +89,13 @@ impl TryFrom<(usize, Field)> for FieldInfo {
         Ok(Self { name, ty, as_ty, try_as, skip })
     }
 }
-impl<'a> From<&'a FieldInfo> for FmtInfo<'a> {
+impl<'a> From<&'a FieldInfo> for FmtInfo {
     #[inline]
-    fn from(value: &'a FieldInfo) -> Self { Self { parsed_ty: value.parsed_ty(), skip: value.skip } }
+    fn from(value: &'a FieldInfo) -> Self { Self { parsed_ty: value.parsed_ty().clone(), parsed_ty_inst: None, skip: value.skip } }
 }
 impl<'a> From<&'a FieldInfo> for ErrInfo<'a> {
     #[inline]
-    fn from(value: &'a FieldInfo) -> Self { Self::new(&value.name, value.parsed_ty(), value.as_ty.as_ref(), value.skip) }
+    fn from(value: &'a FieldInfo) -> Self { Self::new(&value.name, value.parsed_ty().clone(), value.as_ty.as_ref(), value.skip) }
 }
 
 
@@ -125,7 +125,7 @@ pub fn generate_mod_impl(error_mod: &Ident, vis: &Visibility, ident: &Ident, fmt
 }
 
 /// Generates an implementation for the module, i.e., auxillary types.
-pub fn generate_parsable_impl_logic(error_mod: &Ident, outer_attrs: &[OuterAttr], fields: &[FieldInfo], err: &Err) -> TokenStream2 {
+pub fn generate_parsable_impl_logic<A: OuterAttribute>(error_mod: &Ident, outer_attrs: &[A], fields: &[FieldInfo], err: &Err) -> TokenStream2 {
     let error_mod_path = identity_path(error_mod.clone());
     let (whitespace_init, whitespace_pop) = whitespace_pop_impl("rem", outer_attrs);
 
@@ -197,8 +197,12 @@ pub fn handle_impl(outer_attrs: &[OuterAttr], vis: Visibility, ident: Ident, gen
     // First, analyze each field and remember what we need to keep
     let struct_ty = StructTy::from(&fields);
     let fields = fields.into_iter().enumerate().map(FieldInfo::try_from).collect::<Result<Vec<FieldInfo>, Error>>()?;
-    if fields.iter().filter(|f| !f.skip).count() == 0 {
-        return Err(Error::new(ident.span(), "Cannot derive `Parsable` on struct without any (unskipped) fields"));
+    if OuterAttr::has_as(outer_attrs).is_none() && OuterAttr::has_try_as(outer_attrs).is_none() && fields.iter().filter(|f| !f.skip).count() == 0 {
+        return Err(Error::new(
+            ident.span(),
+            "Cannot derive `Parsable` on struct without any (unskipped) fields.\n\nGive it fields, or use another parser via `#[parse(as = ...)]` \
+             or `#[parse(try_as = ...)]`.",
+        ));
     }
 
     // Decide on the formatter & error impls

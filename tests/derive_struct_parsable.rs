@@ -52,6 +52,14 @@ pub struct SkipLong {
     extra: String,
 }
 
+#[derive(Debug, Eq, PartialEq, Parsable)]
+#[parse(as = Dot)]
+pub struct Empty;
+impl From<Dot> for Empty {
+    #[inline]
+    fn from(_value: Dot) -> Self { Self }
+}
+
 
 
 #[derive(Debug, Eq, PartialEq, Parsable)]
@@ -89,7 +97,7 @@ impl From<Comma> for Dot {
 
 /***** TESTS *****/
 #[test]
-fn test_parsable_seq() {
+fn test_struct_parsable_seq() {
     let input1 = Slice::with_raw_id(0, b"12.");
     let input2 = Slice::with_raw_id(0, b"9999999.");
     let input3 = Slice::with_raw_id(0, b"12");
@@ -142,7 +150,7 @@ fn test_parsable_seq() {
 }
 
 #[test]
-fn test_parsable_seq_tuple() {
+fn test_struct_parsable_seq_tuple() {
     let input1 = Slice::with_raw_id(0, b",.");
     let input2 = Slice::with_raw_id(0, b",");
     let input3 = Slice::with_raw_id(0, b".");
@@ -157,7 +165,7 @@ fn test_parsable_seq_tuple() {
 }
 
 #[test]
-fn test_parsable_seq_expects() {
+fn test_struct_parsable_seq_expects() {
     let input1 = Slice::with_raw_id(0, b"fn.");
     let input2 = Slice::with_raw_id(0, b"fn");
     let input3 = Slice::with_raw_id(0, b".");
@@ -175,7 +183,7 @@ fn test_parsable_seq_expects() {
 }
 
 #[test]
-fn test_parsable_seq_as() {
+fn test_struct_parsable_seq_as() {
     let input1 = Slice::with_raw_id(0, b",");
     let input2 = Slice::with_raw_id(0, b".");
     let input3 = Slice::with_raw_id(0, b"fn");
@@ -187,7 +195,7 @@ fn test_parsable_seq_as() {
 }
 
 #[test]
-fn test_parsable_seq_skip() {
+fn test_struct_parsable_seq_skip() {
     let input1 = Slice::with_raw_id(0, b".");
     let input2 = Slice::with_raw_id(0, b"fn");
     let input3 = Slice::with_raw_id(0, b"");
@@ -225,7 +233,17 @@ fn test_parsable_seq_skip() {
 }
 
 #[test]
-fn test_parsable_lit() {
+fn test_struct_parsable_empty() {
+    let input1 = Slice::with_raw_id(0, b".");
+    let input2 = Slice::with_raw_id(0, b"fn");
+    let input3 = Slice::with_raw_id(0, b"");
+    assert_eq!(Empty::parse(input1), Ok((Empty, input1.slice(1..))));
+    assert_eq!(Empty::parse(input2), Err(NibbleError::Unmatched(".", Loc::encapsulate_range(0, ..1))));
+    assert_eq!(Empty::parse(input3), Err(NibbleError::NotEnough(".", Needed::Bounded(1, 1), Loc::encapsulate_range(0, 0..0))));
+}
+
+#[test]
+fn test_struct_parsable_lit() {
     let input1 = Slice::with_raw_id(0, b"12");
     let input2 = Slice::with_raw_id(0, b"0012");
     let input3 = Slice::with_raw_id(0, b"999999999");
@@ -249,7 +267,7 @@ fn test_parsable_lit() {
 }
 
 #[test]
-fn test_parsable_term_whitespace() {
+fn test_struct_parsable_term_whitespace() {
     let input1 = Slice::with_raw_id(0, b", ,");
     let input2 = Slice::with_raw_id(0, b"    , ,");
     let input3 = Slice::with_raw_id(0, b"    ,     ,");
@@ -259,7 +277,7 @@ fn test_parsable_term_whitespace() {
 }
 
 #[test]
-fn test_parsable_kw_term() {
+fn test_struct_parsable_kw_term() {
     let input1 = Slice::with_raw_id(0, b"fn");
     let input2 = Slice::with_raw_id(0, b"fn fn");
     let input3 = Slice::with_raw_id(0, b"fnfn");
@@ -277,7 +295,7 @@ fn test_parsable_kw_term() {
 }
 
 #[test]
-fn test_parsable_punct_term() {
+fn test_struct_parsable_punct_term() {
     let input1 = Slice::with_raw_id(0, b".");
     let input2 = Slice::with_raw_id(0, b". .");
     let input3 = Slice::with_raw_id(0, b"..");

@@ -19,8 +19,12 @@ path = "./tests/derive_located.rs"
 required-features = ["loc", "proc-macros"]
 
 [[test]]
-name = "derive_parsable"
-path = "./tests/derive_parsable.rs"
+name = "derive_struct_parsable"
+path = "./tests/derive_struct_parsable.rs"
+required-features = ["nibble", "loc", "proc-macros"]
+[[test]]
+name = "derive_enum_parsable"
+path = "./tests/derive_enum_parsable.rs"
 required-features = ["nibble", "loc", "proc-macros"]
 
 [[test]]

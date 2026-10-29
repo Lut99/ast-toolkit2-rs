@@ -10,7 +10,7 @@ use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::{ToTokens, quote};
 use syn::{Generics, LitInt, LitStr, Path, Type};
 
-use super::super::OuterAttr;
+use super::super::OuterAttribute;
 
 
 /***** GENERATORS *****/
@@ -28,7 +28,7 @@ impl<'f, 'a> ToTokens for FmtDef<'f, 'a> {
         let fields_def: TokenStream2 = infos
             .into_iter()
             .map(|info| {
-                let ty = info.parsed_ty;
+                let ty = &info.parsed_ty;
                 if !info.skip {
                     // Normal implementation; refer to the parser's Formatter type.
                     quote! { pub <#ty as ::ast_toolkit2::nibble::Parsable<::std::primitive::u8>>::Formatter, }
@@ -125,7 +125,7 @@ impl<'p, 'f, 'a> ToTokens for FmtInst<'p, 'f, 'a> {
                     .into_iter()
                     .map(|i| {
                         if !i.skip {
-                            let ty = &i.parsed_ty;
+                            let ty = i.parsed_ty_inst.as_ref().unwrap_or(&i.parsed_ty);
                             quote! { <#ty as ::ast_toolkit2::nibble::Parsable<::std::primitive::u8>>::expects(), }
                         } else {
                             quote! { ::std::marker::PhantomData, }
@@ -151,16 +151,20 @@ impl<'p, 'f, 'a> ToTokens for FmtInst<'p, 'f, 'a> {
 
 /***** AUXILLARY *****/
 /// Defines everything the [`Fmt`] needs to know about nested parsers.
-pub struct FmtInfo<'a> {
+pub struct FmtInfo {
     /// The type of the nested parser.
     ///
     /// Note that this is the parsed type; we're looking after `as` and such.
-    pub parsed_ty: &'a Type,
+    pub parsed_ty: Type,
+    /// The type of the nested parser, but during instantiation of the formatter.
+    ///
+    /// Leave empty if the `parsed_ty` is good enough.
+    pub parsed_ty_inst: Option<Type>,
     /// Whether this parser is skipped or not.
     ///
     /// Skipped fields still need to be present in the Formatter impl to ensure there are no
     /// unused generics.
-    pub skip:      bool,
+    pub skip: bool,
 }
 
 
@@ -173,14 +177,14 @@ pub enum Fmt<'a> {
     // YES generation
     /// The type we're generating `Parsable` for has multiple formatters, time to pull up our
     /// sleeves.
-    Generate(&'static str, &'a Generics, &'a Path, Vec<FmtInfo<'a>>),
+    Generate(&'static str, &'a Generics, &'a Path, Vec<FmtInfo>),
 
     // NO generation
     /// The user specified a manual `expects`-string.
     Manual(&'a LitStr),
     /// A type we're generating `Parsable` for has only one nested parser. No need to generate
     /// anything extra.
-    Identity(FmtInfo<'a>),
+    Identity(FmtInfo),
 }
 
 // Constructors
@@ -200,20 +204,20 @@ impl<'a> Fmt<'a> {
     /// # Returns
     /// A new Fmt that can be used to generate a Formatter implementation and every reference to
     /// it.
-    pub fn new<'o: 'a, 'p: 'a, 'g: 'a, 'i: 'a>(
+    pub fn new<'o: 'a, 'p: 'a, 'g: 'a, A: OuterAttribute>(
         conn: &'static str,
-        attrs: &'o [OuterAttr],
+        attrs: &'o [A],
         path: &'p Path,
         gens: &'g Generics,
-        infos: impl IntoIterator<Item = FmtInfo<'i>>,
+        infos: impl IntoIterator<Item = FmtInfo>,
     ) -> Self {
         // See if the user overrides whatever we thought of
-        if let Some(expected) = OuterAttr::has_expects(attrs) {
+        if let Some(expected) = OuterAttribute::has_expects(attrs) {
             return Self::Manual(expected);
         }
 
         // Decide what to do based on the number of infos
-        let infos = infos.into_iter().collect::<Vec<FmtInfo<'i>>>();
+        let infos = infos.into_iter().collect::<Vec<FmtInfo>>();
         let nonskipped_count = infos.iter().filter(|i| !i.skip).count();
         if nonskipped_count == 1 {
             Self::Identity(infos.into_iter().filter(|i| !i.skip).next().unwrap())
