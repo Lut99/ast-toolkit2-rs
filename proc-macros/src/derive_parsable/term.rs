@@ -9,7 +9,8 @@ use proc_macro2::TokenStream as TokenStream2;
 use quote::{ToTokens, quote};
 use syn::{Error, Fields, Generics, Ident, LitStr};
 
-use super::{OuterAttr, whitespace_pop_impl};
+use super::OuterAttr;
+use super::aux::whitespace_pop_impl;
 
 
 /***** LIBRARY *****/

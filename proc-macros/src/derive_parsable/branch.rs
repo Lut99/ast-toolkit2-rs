@@ -10,8 +10,9 @@ use quote::{ToTokens as _, quote};
 use syn::spanned::Spanned as _;
 use syn::{DataEnum, Error, Generics, Ident, Type, Visibility};
 
+use super::aux::whitespace_pop_impl;
 use super::seq::cook_up_error_mod_name;
-use super::{OuterAttr, parse_parse_attrs, whitespace_pop_impl};
+use super::{OuterAttr, parse_parse_attrs};
 use crate::derive_parsable::VariantAttr;
 
 
@@ -82,30 +83,30 @@ pub fn handle_impl(outer_attrs: &[OuterAttr], vis: Visibility, ident: Ident, mut
     // Get some whitespace info
     let (whitespace_init, whitespace_pop) = whitespace_pop_impl("rem", outer_attrs);
 
-    // Generate the module with the error- and formatter types
-    let mut res = TokenStream2::new();
-    res.extend(quote! {
-        #[doc = ::std::concat!("Helper module for [`", ::std::stringify!(#ident), "`] containing auxillary types.")]
-        #vis mod #error_mod {
-            use super::*;
-
-            #[doc = ::std::concat!("Formatting type for genering the [expects](::ast_toolkit2::nibble::Parsable::expects())-implementation of [`", ::std::stringify!(#ident), "`].")]
-            #[derive(::std::clone::Clone, ::std::marker::Copy, ::std::fmt::Debug, ::std::cmp::Eq, ::std::cmp::PartialEq)]
-            pub struct Formatter #gens {
-                #fields_def
-            }
-
-            #[automatically_derived]
-            impl #impl_gen ::std::fmt::Display for Formatter #ty_gen #where_bounds {
-                #[inline]
-                fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-                    #fmt_impl
-                    ::std::fmt::Result::Ok(())
-                }
-            }
-        }
-    });
+    //     // Generate the module with the error- and formatter types
+    //     let mut res = TokenStream2::new();
+    //     res.extend(quote! {
+    //         #[doc = ::std::concat!("Helper module for [`", ::std::stringify!(#ident), "`] containing auxillary types.")]
+    //         #vis mod #error_mod {
+    //             use super::*;
+    //
+    //             #[doc = ::std::concat!("Formatting type for genering the [expects](::ast_toolkit2::nibble::Parsable::expects())-implementation of [`", ::std::stringify!(#ident), "`].")]
+    //             #[derive(::std::clone::Clone, ::std::marker::Copy, ::std::fmt::Debug, ::std::cmp::Eq, ::std::cmp::PartialEq)]
+    //             pub struct Formatter #gens {
+    //                 #fields_def
+    //             }
+    //
+    //             #[automatically_derived]
+    //             impl #impl_gen ::std::fmt::Display for Formatter #ty_gen #where_bounds {
+    //                 #[inline]
+    //                 fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+    //                     #fmt_impl
+    //                     ::std::fmt::Result::Ok(())
+    //                 }
+    //             }
+    //         }
+    //     });
 
     // Now run the generation ~~
-    quote! {}
+    Ok(quote! {})
 }

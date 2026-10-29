@@ -10,7 +10,8 @@ use quote::{ToTokens, quote};
 use syn::spanned::Spanned as _;
 use syn::{Error, Fields, Generics, Ident, LitStr, Type};
 
-use super::{OuterAttr, whitespace_pop_impl};
+use super::OuterAttr;
+use super::aux::whitespace_pop_impl;
 
 
 /***** LIBRARY *****/
