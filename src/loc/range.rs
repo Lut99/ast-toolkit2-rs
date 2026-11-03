@@ -140,7 +140,7 @@ impl Index for isize {
 /// This either a concrete (but excessive) number of elements, or a
 /// [special value](Length::Indefinite) indicating that the range continues until the end of the
 /// sequence, always.
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum Length {
     /// It's a concrete number of elements.

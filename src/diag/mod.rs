@@ -12,6 +12,7 @@
 mod annots;
 mod diag;
 pub mod layout;
+pub mod layout2;
 mod themes;
 
 // Use 'em
