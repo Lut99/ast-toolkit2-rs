@@ -20,7 +20,7 @@ use std::sync::{Arc, MutexGuard, RwLockReadGuard, RwLockWriteGuard};
 
 // Re-export some node macros
 #[cfg(feature = "proc-macros")]
-pub use ast_toolkit2_proc_macros::{Node, NonTerm, Term};
+pub use ast_toolkit2_proc_macros::Node;
 
 use crate::loc::Located;
 

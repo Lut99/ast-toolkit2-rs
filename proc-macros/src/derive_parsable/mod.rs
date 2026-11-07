@@ -15,7 +15,7 @@ mod term;
 // Imports
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
-use syn::ext::IdentExt;
+use syn::ext::IdentExt as _;
 use syn::parse::{Parse, ParseStream, Parser as _};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned as _;
@@ -33,6 +33,16 @@ fn parse_parse_attrs<A: Attribute>(attrs: &[syn::Attribute]) -> Result<Vec<A>, E
                 // Parse the meta as further metas
                 let inner: Punctuated<A, Token![,]> = Punctuated::parse_terminated.parse2(l.tokens.clone())?;
                 res.extend(inner.into_iter());
+            },
+            Meta::List(l) if l.path.is_ident("node") => {
+                // Ignore if this attribute type doesn't do nodes
+                if !A::ACCEPTS_NODE {
+                    continue;
+                }
+
+                // Parse the meta as further metas
+                let inner: Punctuated<crate::derive_node::OuterAttr, Token![,]> = Punctuated::parse_terminated.parse2(l.tokens.clone())?;
+                res.extend(inner.into_iter().filter_map(A::from_node_attr))
             },
 
             // Ignore
@@ -109,6 +119,11 @@ fn generate_try_as_impl(ident: &Ident, gens: &Generics, other: &Type) -> TokenSt
 
 /***** HELPERS *****/
 trait Attribute: Parse {
+    const ACCEPTS_NODE: bool;
+    /// Either parses `self` from the given node attribute, or fails and we assume this isn't
+    /// recognized here.
+    #[inline(always)]
+    fn from_node_attr(_attr: crate::derive_node::OuterAttr) -> Option<Self> { unreachable!() }
     fn check_consistency(attrs: &[Self]) -> Result<(), Error>;
 }
 trait OuterAttribute: Attribute {
@@ -204,6 +219,15 @@ impl OuterAttribute for OuterAttr {
     }
 }
 impl Attribute for OuterAttr {
+    const ACCEPTS_NODE: bool = true;
+    fn from_node_attr(attr: crate::derive_node::OuterAttr) -> Option<Self> {
+        match attr {
+            crate::derive_node::OuterAttr::Lit(regex) => Some(Self::Lit { regex }),
+            crate::derive_node::OuterAttr::NonTerm => None,
+            crate::derive_node::OuterAttr::Term(tag) => Some(Self::Term { tag }),
+        }
+    }
+
     /// Check if the list of attributes makes sense.
     fn check_consistency(attrs: &[Self]) -> Result<(), Error> {
         if let Some(a) = Self::has_as(attrs)
@@ -349,6 +373,8 @@ impl OuterAttribute for VariantAttr {
     }
 }
 impl Attribute for VariantAttr {
+    const ACCEPTS_NODE: bool = false;
+
     /// Check if the list of attributes makes sense.
     fn check_consistency(attrs: &[Self]) -> Result<(), Error> {
         if let Some(lit) = Self::has_lit(attrs)
@@ -434,6 +460,8 @@ impl FieldAttr {
     fn has_skip(attrs: &[Self]) -> bool { attrs.iter().find(|a| matches!(a, Self::Skip)).is_some() }
 }
 impl Attribute for FieldAttr {
+    const ACCEPTS_NODE: bool = false;
+
     /// Check if the list of attributes makes sense.
     fn check_consistency(attrs: &[Self]) -> Result<(), Error> {
         if let Some(other) = Self::has_as(attrs)

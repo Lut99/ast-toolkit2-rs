@@ -84,7 +84,7 @@ impl From<Dot> for Comma {
 }
 
 #[derive(Debug, Eq, PartialEq, Parsable)]
-#[parse(term = ".")]
+#[node(term = ".")]
 pub struct Dot(TestLoc);
 impl From<Comma> for Dot {
     #[inline]

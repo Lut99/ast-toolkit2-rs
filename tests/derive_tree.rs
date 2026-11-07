@@ -61,16 +61,19 @@ fn test_derive_node_enums() {
 
 #[test]
 fn test_derive_nonterm_structs() {
-    #[derive(Located, Node, NonTerm)]
+    #[derive(Located, Node)]
+    #[node(nonterm)]
     pub struct StructSimple {
         foo: String,
         loc: Loc,
     }
 
-    #[derive(Located, Node, NonTerm)]
+    #[derive(Located, Node)]
+    #[node(nonterm)]
     pub struct TupleSimple(String, #[loc] Loc);
 
-    #[derive(Located, Node, NonTerm)]
+    #[derive(Located, Node)]
+    #[node(nonterm)]
     pub struct TupleGen<T>(T);
 
 
@@ -81,7 +84,8 @@ fn test_derive_nonterm_structs() {
 
 #[test]
 fn test_derive_nonterm_enums() {
-    #[derive(Located, Node, NonTerm)]
+    #[derive(Located, Node)]
+    #[node(nonterm)]
     pub enum EnumSimple {
         Foo { foo: String, loc: Loc },
         Bar(String, #[loc] Loc),
@@ -94,16 +98,19 @@ fn test_derive_nonterm_enums() {
 
 #[test]
 fn test_derive_term_structs() {
-    #[derive(Located, Node, Term)]
+    #[derive(Located, Node)]
+    #[node(term = "gibberish")]
     pub struct StructSimple {
         foo: String,
         loc: Loc,
     }
 
-    #[derive(Located, Node, Term)]
+    #[derive(Located, Node)]
+    #[node(term = "gibberish")]
     pub struct TupleSimple(String, #[loc] Loc);
 
-    #[derive(Located, Node, Term)]
+    #[derive(Located, Node)]
+    #[node(term = "gibberish")]
     pub struct TupleGen<T>(T);
 
 
@@ -114,7 +121,8 @@ fn test_derive_term_structs() {
 
 #[test]
 fn test_derive_term_enums() {
-    #[derive(Located, Node, Term)]
+    #[derive(Located, Node)]
+    #[node(lit = "gibberish")]
     pub enum EnumSimple {
         Foo { foo: String, loc: Loc },
         Bar(String, #[loc] Loc),

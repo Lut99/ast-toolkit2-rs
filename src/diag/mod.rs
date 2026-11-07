@@ -11,7 +11,7 @@
 // Declare the nested modules
 mod annots;
 mod diag;
-pub mod layout;
+// pub mod layout;
 pub mod layout2;
 mod themes;
 
@@ -20,7 +20,7 @@ pub use annots::{Annotation, Severity};
 #[cfg(feature = "proc-macros")]
 pub use ast_toolkit2_proc_macros::Diagnostic;
 pub use diag::Diag;
-pub use layout::{RenderedDiag, Renderer};
+// pub use layout::{RenderedDiag, Renderer};
 pub use themes::Theme;
 
 

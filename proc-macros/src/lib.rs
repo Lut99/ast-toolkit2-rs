@@ -14,12 +14,8 @@ mod derive_diagnostic;
 mod derive_located;
 #[cfg(feature = "tree")]
 mod derive_node;
-#[cfg(feature = "tree")]
-mod derive_nonterm;
 #[cfg(feature = "nibble")]
 mod derive_parsable;
-#[cfg(feature = "tree")]
-mod derive_term;
 
 // Imports
 #[cfg(any(feature = "loc", feature = "tree"))]
@@ -199,8 +195,9 @@ pub fn derive_located(item: TokenStream) -> TokenStream {
 ///
 /// Including:
 /// - type generation name collisions for sequences;
+/// - also using `node`
 #[cfg(feature = "nibble")]
-#[proc_macro_derive(Parsable, attributes(parse))]
+#[proc_macro_derive(Parsable, attributes(node, parse))]
 pub fn derive_parsable(item: TokenStream) -> TokenStream {
     match derive_parsable::handle(item.into()) {
         Ok(res) => res.into(),
@@ -211,97 +208,63 @@ pub fn derive_parsable(item: TokenStream) -> TokenStream {
 
 
 // ast_toolkit2::tree
-/// A procedural macro for automatically deriving the `Node`-trait.
-///
-/// For now, the `Node`-trait doesn't implement anything, so this macro just generates an empty
-/// implementation.
+/// A procedural macro for automatically deriving the `Node`-, `NonTerm`- and `Term`-traits.
 ///
 /// # Usage
-/// To use this macro, add it to your struct with the `derive`-attribute:
+/// There is three flavours to deriving your type.
+///
+/// ## Nonterminals
+/// Nonterminals are branches in your tree. Derive them using the `#[node(nonterm)]`-attribute.
+///
+/// ## Literals
+/// Literals are leaves in your tree that do not parse a static piece of text, but rather a value.
+/// Derive them using the `#[node(lit = "...")]`-attribute, where `...` is a regular expression
+/// defining the syntax of values parsed.
+///
+/// ## Terminals
+/// Terminals are leaves in your tree that parse static pieces of text. Derive them using the
+/// `#[node(term = "...")]` attribute, where `...` is the text to parse.
+///
+/// # Examples
+/// All of them together:
 /// ```ignore
-/// use ast_toolkit2::tree::Node;
+/// use ast_toolkit2::tree::{Node, NonTerm, Term};
 ///
 /// #[derive(Node)]
-/// struct Foo;
+/// #[node(nonterm)]
+/// struct Sentence(LitInt, Dot);
 ///
-/// fn assert_node<T: Node>(_t: T) {}
+/// #[derive(Node)]
+/// #[node(lit = "^[0-9]+")]
+/// struct LitInt;
 ///
-/// assert_node!(Foo);
+/// #[derive(Node)]
+/// #[node(term = ".")]
+/// struct Dot;
+///
+///
+/// fn assert_node<T: Node>() {}
+/// fn assert_nonterm<T: NonTerm>() {}
+/// fn assert_term<T: Term>() {}
+///
+/// assert_node::<Sentence>();
+/// assert_nonterm::<Sentence>();
+/// // assert_term::<Sentence>();
+/// assert_node::<LitInt>();
+/// // assert_nonterm::<LitInt>();
+/// assert_term::<LitInt>();
+/// assert_node::<Dot>();
+/// // assert_nonterm::<Dot>();
+/// assert_term::<Dot>();
 /// ```
 ///
-/// ## A note on generics
-/// Note that, instead of requiring `Node` on all generics, this macro instead will require
-/// `Located` on all generics.
-///
-/// If you need other generic behaviour, you should implement `Node` yourself.
+/// # A note on generics
+/// All generic types of your struct will require `Node` to have `Node`, `NonTerm` or `Term`
+/// implemented.
 #[cfg(feature = "tree")]
-#[proc_macro_derive(Node)]
+#[proc_macro_derive(Node, attributes(node))]
 pub fn derive_node(item: TokenStream) -> TokenStream {
     match derive_node::handle(item.into()) {
-        Ok(res) => res.into(),
-        Err(err) => err.into_compile_error().into(),
-    }
-}
-
-/// A procedural macro for automatically deriving the `NonTerm`-trait.
-///
-/// For now, the `NonTerm`-trait doesn't implement anything, so this macro just generates an empty
-/// implementation.
-///
-/// # Usage
-/// To use this macro, add it to your struct with the `derive`-attribute:
-/// ```ignore
-/// use ast_toolkit2::tree::NonTerm;
-///
-/// #[derive(NonTerm)]
-/// struct Foo;
-///
-/// fn assert_nonterm<T: NonTerm>(_t: T) {}
-///
-/// assert_nonterm!(Foo);
-/// ```
-///
-/// ## A note on generics
-/// Note that, instead of requiring `NonTerm` on all generics, this macro instead will require
-/// `Located` on all generics.
-///
-/// If you need other generic behaviour, you should implement `NonTerm` yourself.
-#[cfg(feature = "tree")]
-#[proc_macro_derive(NonTerm)]
-pub fn derive_nonterm(item: TokenStream) -> TokenStream {
-    match derive_nonterm::handle(item.into()) {
-        Ok(res) => res.into(),
-        Err(err) => err.into_compile_error().into(),
-    }
-}
-
-/// A procedural macro for automatically deriving the `Term`-trait.
-///
-/// For now, the `Term`-trait doesn't implement anything, so this macro just generates an empty
-/// implementation.
-///
-/// # Usage
-/// To use this macro, add it to your struct with the `derive`-attribute:
-/// ```ignore
-/// use ast_toolkit2::tree::Term;
-///
-/// #[derive(Term)]
-/// struct Foo;
-///
-/// fn assert_term<T: Term>(_t: T) {}
-///
-/// assert_term!(Foo);
-/// ```
-///
-/// ## A note on generics
-/// Note that, instead of requiring `Term` on all generics, this macro instead will require
-/// `Located` on all generics.
-///
-/// If you need other generic behaviour, you should implement `Term` yourself.
-#[cfg(feature = "tree")]
-#[proc_macro_derive(Term)]
-pub fn derive_term(item: TokenStream) -> TokenStream {
-    match derive_term::handle(item.into()) {
         Ok(res) => res.into(),
         Err(err) => err.into_compile_error().into(),
     }
