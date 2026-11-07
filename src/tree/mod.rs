@@ -33,11 +33,20 @@ pub mod prelude {
 /***** HELPER MACROS *****/
 /// Does pointer-like implementations for [`Node`].
 macro_rules! node_ptr_impl {
+    (__impl) => {
+        #[inline(always)]
+        fn children(&self) -> Box<dyn '_ + Iterator<Item = &dyn Node>> { <T as Node>::children(self) }
+    };
+
     ('a, $ty:ty) => {
-        impl<'a, T: Node> Node for $ty {}
+        impl<'a, T: Node> Node for $ty {
+            node_ptr_impl!(__impl);
+        }
     };
     ($ty:ty) => {
-        impl<T: Node> Node for $ty {}
+        impl<T: Node> Node for $ty {
+            node_ptr_impl!(__impl);
+        }
     };
 }
 
@@ -81,7 +90,15 @@ macro_rules! term_ptr_impl {
 ///   Terminals explicitly _don't_ have any children.
 ///
 /// Despite this difference, this trait represents the general part of the two.
-pub trait Node: Located {}
+pub trait Node: Located {
+    /// Returns an iterator over all children of this node.
+    ///
+    /// The returned iterator should traverse the children depth-first.
+    ///
+    /// # Returns
+    /// A dynamic [`Iterator`] that yields all children by-reference.
+    fn children(&self) -> Box<dyn '_ + Iterator<Item = &dyn Node>>;
+}
 
 // Pointer-like impls
 node_ptr_impl!('a, &'a T);

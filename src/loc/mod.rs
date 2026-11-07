@@ -415,6 +415,13 @@ impl Located for Loc {
     #[inline(always)]
     fn loc(&self) -> Loc { *self }
 }
+#[cfg(feature = "tree")]
+impl crate::tree::Node for Loc {
+    /// Uniformity implementation for `Loc`. No children on it, but it _could_ be seen as a node in
+    /// your tree.
+    #[inline(always)]
+    fn children(&self) -> Box<dyn '_ + Iterator<Item = &dyn crate::prelude::Node>> { Box::new([].into_iter()) }
+}
 
 // Conversion
 impl<A: Located> FromIterator<A> for Loc {
