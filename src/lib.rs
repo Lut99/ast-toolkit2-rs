@@ -8,8 +8,8 @@
 // Declare the modules
 #[cfg(feature = "diag")]
 pub mod diag;
-#[cfg(feature = "init")]
-pub mod init;
+// #[cfg(feature = "init")]
+// pub mod init;
 #[cfg(feature = "loc")]
 pub mod loc;
 #[cfg(feature = "nibble")]
@@ -22,12 +22,14 @@ pub mod punct;
 pub mod sources;
 #[cfg(feature = "tree")]
 pub mod tree;
+#[cfg(feature = "visit")]
+pub mod visit;
 
 /// Represents all the interfaces that are often used when working with the AST-toolkit and are
 /// thus useful to "import by default".
 pub mod prelude {
-    #[cfg(feature = "init")]
-    pub use super::init::prelude::*;
+    // #[cfg(feature = "init")]
+    // pub use super::init::prelude::*;
     #[cfg(feature = "loc")]
     pub use super::loc::prelude::*;
     #[cfg(feature = "nibble")]
@@ -38,6 +40,8 @@ pub mod prelude {
     pub use super::punct::prelude::*;
     #[cfg(feature = "tree")]
     pub use super::tree::prelude::*;
+    #[cfg(feature = "visit")]
+    pub use super::visit::prelude::*;
 }
 
 /// Represents re-exports of macros.

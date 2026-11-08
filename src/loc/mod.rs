@@ -44,6 +44,8 @@ mod spec;
 pub mod test;
 
 // Imports
+#[cfg(feature = "tree")]
+use std::any::Any;
 use std::cmp::Ordering;
 use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
@@ -417,10 +419,9 @@ impl Located for Loc {
 }
 #[cfg(feature = "tree")]
 impl crate::tree::Node for Loc {
-    /// Uniformity implementation for `Loc`. No children on it, but it _could_ be seen as a node in
-    /// your tree.
+    /// Uniformity implementation for `Loc`.
     #[inline(always)]
-    fn children(&self) -> Box<dyn '_ + Iterator<Item = &dyn crate::prelude::Node>> { Box::new([].into_iter()) }
+    fn as_any(&self) -> &dyn Any { self as &dyn Any }
 }
 
 // Conversion

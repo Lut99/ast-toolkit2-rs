@@ -13,12 +13,12 @@
 //!     detailled work.
 //
 
-// Modules
+// Imports & Exports
+use std::any::Any;
 use std::cell::{Ref, RefMut};
 use std::rc::Rc;
 use std::sync::{Arc, MutexGuard, RwLockReadGuard, RwLockWriteGuard};
 
-// Re-export some node macros
 #[cfg(feature = "proc-macros")]
 pub use ast_toolkit2_proc_macros::Node;
 
@@ -26,7 +26,7 @@ use crate::loc::Located;
 
 /// Shorthand for including all the traits of this crate.
 pub mod prelude {
-    pub use super::*;
+    pub use super::{Node, NonTerm, Term};
 }
 
 
@@ -35,7 +35,7 @@ pub mod prelude {
 macro_rules! node_ptr_impl {
     (__impl) => {
         #[inline(always)]
-        fn children(&self) -> Box<dyn '_ + Iterator<Item = &dyn Node>> { <T as Node>::children(self) }
+        fn as_any(&self) -> &dyn Any { <T as Node>::as_any(self) }
     };
 
     ('a, $ty:ty) => {
@@ -91,13 +91,16 @@ macro_rules! term_ptr_impl {
 ///
 /// Despite this difference, this trait represents the general part of the two.
 pub trait Node: Located {
-    /// Returns an iterator over all children of this node.
+    /// Returns this Node as an [`Any`].
     ///
-    /// The returned iterator should traverse the children depth-first.
-    ///
-    /// # Returns
-    /// A dynamic [`Iterator`] that yields all children by-reference.
-    fn children(&self) -> Box<dyn '_ + Iterator<Item = &dyn Node>>;
+    /// This will allow downcasting/upcasting later. Used internally when visiting.
+    fn as_any(&self) -> &dyn Any;
+}
+
+// Std impls
+impl<T: 'static + Located> Node for Vec<T> {
+    #[inline]
+    fn as_any(&self) -> &dyn Any { self as &dyn Any }
 }
 
 // Pointer-like impls
@@ -121,6 +124,9 @@ node_ptr_impl!('a, RwLockWriteGuard<'a, T>);
 /// and order of specific, already parsed, constructs rather than with e.g. whitespace. You can
 /// think of them as an understanding of a stream of [`Term`]inals.
 pub trait NonTerm: Node {}
+
+// Std impls
+impl<T: 'static + Located> NonTerm for Vec<T> {}
 
 // Pointer-like impls
 nonterm_ptr_impl!('a, &'a T);

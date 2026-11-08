@@ -58,13 +58,14 @@ parse = ["nibble"]
 
 # Functionality
 diag = ["loc", "ast-toolkit2-proc-macros/diag", "dep:unicode-segmentation"]
-init = []
+# init = []
 loc = ["ast-toolkit2-proc-macros/loc"]
 nibble = ["dep:regex", "ast-toolkit2-proc-macros/nibble", "loc"]
 print = ["ast-toolkit2-decl-macros/print"]
 punct = ["ast-toolkit2-decl-macros/punct"]
 sources = ["loc", "dep:hashbrown", "dep:polonius-the-crab"]
 tree = ["loc", "ast-toolkit2-proc-macros/tree"]
+visit = ["loc", "tree"]
 
 # Third-party
 color = ["dep:console"]
