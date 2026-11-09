@@ -32,6 +32,11 @@ name = "derive_tree"
 path = "./tests/derive_tree.rs"
 required-features = ["loc", "proc-macros", "tree"]
 
+[[test]]
+name = "visit"
+path = "./tests/visit.rs"
+required-features = ["visit"]
+
 
 [dependencies]
 console = { version = "0.16.0", default-features = false, features = ["std"], optional = true }

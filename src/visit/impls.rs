@@ -5,8 +5,7 @@
 //!   Implements [`Visit`] and [`VisitMut`] for some [`std`] types.
 //
 
-use super::visitor::Visitor;
-use super::{Visit, VisitMut};
+use super::{Visit, VisitMut, Visitor, VisitorMut};
 
 
 /***** ITERATORS *****/
@@ -17,7 +16,7 @@ use super::{Visit, VisitMut};
 
 /***** IMPLS *****/
 impl<T: 'static + Visit> Visit for Vec<T> {
-    fn visit(&self, visitor: &mut super::Visitor) {
+    fn visit<V: Visitor>(&self, visitor: &mut V) {
         for node in self {
             visitor.visit(node);
         }
@@ -25,7 +24,7 @@ impl<T: 'static + Visit> Visit for Vec<T> {
 }
 impl<T: 'static + VisitMut> VisitMut for Vec<T> {
     #[inline]
-    fn visit_mut(&mut self, visitor: &mut Visitor) {
+    fn visit_mut<V: VisitorMut>(&mut self, visitor: &mut V) {
         for node in self {
             visitor.visit_mut(node);
         }

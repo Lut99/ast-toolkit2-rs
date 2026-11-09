@@ -223,6 +223,7 @@ impl Attribute for OuterAttr {
     fn from_node_attr(attr: crate::derive_node::OuterAttr) -> Option<Self> {
         match attr {
             crate::derive_node::OuterAttr::Lit(regex) => Some(Self::Lit { regex }),
+            crate::derive_node::OuterAttr::NoMut => None,
             crate::derive_node::OuterAttr::NonTerm => None,
             crate::derive_node::OuterAttr::Term(tag) => Some(Self::Term { tag }),
         }

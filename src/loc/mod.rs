@@ -423,6 +423,12 @@ impl crate::tree::Node for Loc {
     #[inline(always)]
     fn as_any(&self) -> &dyn Any { self as &dyn Any }
 }
+#[cfg(feature = "tree")]
+impl crate::tree::NodeMut for Loc {
+    /// Uniformity implementation for `Loc`.
+    #[inline(always)]
+    fn as_any_mut(&mut self) -> &mut dyn Any { self as &mut dyn Any }
+}
 
 // Conversion
 impl<A: Located> FromIterator<A> for Loc {

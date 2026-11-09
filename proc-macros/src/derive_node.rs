@@ -72,6 +72,7 @@ impl<I: Iterator<Item = Result<A, E>>, A: Iterator, E> Iterator for FlattenRes<I
 /// Defines struct/enum-level attributes for `#[node(...)]`.
 pub enum OuterAttr {
     Lit(LitStr),
+    NoMut,
     NonTerm,
     Term(LitStr),
 }
@@ -83,6 +84,8 @@ impl OuterAttr {
             _ => None,
         })
     }
+    #[inline]
+    fn has_no_mut(attrs: &[Self]) -> bool { attrs.into_iter().any(|a| matches!(a, Self::NoMut)) }
     #[inline]
     fn has_nonterm(attrs: &[Self]) -> bool { attrs.into_iter().any(|a| matches!(a, Self::NonTerm)) }
     #[inline]
@@ -120,6 +123,8 @@ impl Parse for OuterAttr {
         if ident == "lit" || ident == "literal" {
             input.parse::<Token![=]>()?;
             Ok(Self::Lit(input.parse()?))
+        } else if ident == "nomut" || ident == "no_mut" {
+            Ok(Self::NoMut)
         } else if ident == "nonterm" || ident == "nonterminal" {
             Ok(Self::NonTerm)
         } else if ident == "term" || ident == "terminal" {
@@ -161,16 +166,29 @@ pub fn handle(item: TokenStream2) -> Result<TokenStream2, Error> {
         .collect::<Result<Vec<OuterAttr>, Error>>()?;
     OuterAttr::check_consistency(&attrs)?;
 
-    // Generate the node impl
-    // NOTE: Inherited this because we need to implement `Located`.
+    // Generate the node mut impl
     inject_lifetime("'static", &mut generics);
     inject_trait_bound(["ast_toolkit2", "loc", "Located"], &mut generics);
     let (impl_gen, ty_gen, where_clauses) = generics.split_for_impl();
+    let node_mut_impl = if !OuterAttr::has_no_mut(&attrs) {
+        quote! {
+            impl #impl_gen ::ast_toolkit2::tree:NodeMut for #ident #ty_gen #where_clauses {
+                #[inline(always)]
+                fn as_any_mut(&mut self) -> &mut dyn ::std::any::Any { self as &mut dyn ::std::any::Any }
+            }
+        }
+    } else {
+        TokenStream2::new()
+    };
+
+    // Generate the base node impl
+    // NOTE: Inherited this because we need to implement `Located`.
     let mut res = quote! {
         impl #impl_gen ::ast_toolkit2::tree::Node for #ident #ty_gen #where_clauses {
             #[inline(always)]
             fn as_any(&self) -> &dyn ::std::any::Any { self as &dyn ::std::any::Any }
         }
+        #node_mut_impl
     };
 
     // Then generate the appropriate subtrait

@@ -16,20 +16,20 @@
 
 // Modules
 mod impls;
-mod visitor;
+mod replace_with;
 
 // Imports & Exports
 use std::cell::{Ref, RefMut};
 use std::rc::Rc;
 use std::sync::{Arc, MutexGuard, RwLockReadGuard, RwLockWriteGuard};
 
-pub use visitor::Visitor;
+pub use replace_with::ReplaceWith;
 
-use crate::tree::Node;
+use crate::tree::{Node, NodeMut};
 
 /// Shorthand for including all the traits of this crate.
 pub mod prelude {
-    pub use super::{Visit, VisitMut};
+    pub use super::{ReplaceWith, Visit, VisitMut};
 }
 
 
@@ -37,7 +37,7 @@ pub mod prelude {
 macro_rules! visit_ptr_impl {
     (__impl) => {
         #[inline(always)]
-        fn visit(&self, visitor: &mut Visitor) { <T as Visit>::visit(self, visitor) }
+        fn visit<V: Visitor>(&self, visitor: &mut V) { <T as Visit>::visit(self, visitor) }
     };
 
     ('a, $ty:ty) => {
@@ -55,7 +55,7 @@ macro_rules! visit_ptr_impl {
 macro_rules! visit_mut_ptr_impl {
     (__impl) => {
         #[inline(always)]
-        fn visit_mut(&mut self, visitor: &mut Visitor) { <T as VisitMut>::visit_mut(self, visitor) }
+        fn visit_mut<V: VisitorMut>(&mut self, visitor: &mut V) { <T as VisitMut>::visit_mut(self, visitor) }
     };
 
     ('a, $ty:ty) => {
@@ -94,7 +94,7 @@ pub trait Visit: Node {
     ///   node's [`Visit`] implementation.
     ///
     /// # Returns
-    fn visit(&self, visitor: &mut Visitor);
+    fn visit<V: Visitor>(&self, visitor: &mut V);
 }
 
 // Pointer-like impls
@@ -115,7 +115,7 @@ visit_ptr_impl!('a, RwLockWriteGuard<'a, T>);
 ///
 /// This trait allows mutable, by-reference access to the children. See [`Visit`] for read-only,
 /// by-reference access or [`VisitOwned`] for consuming, owned access.
-pub trait VisitMut: Visit {
+pub trait VisitMut: NodeMut + Visit {
     /// Visits the node "standardly", i.e., traverses its children without visiting the node
     /// itself.
     ///
@@ -128,7 +128,7 @@ pub trait VisitMut: Visit {
     ///   node's [`Visit`] implementation.
     ///
     /// # Returns
-    fn visit_mut(&mut self, visitor: &mut Visitor);
+    fn visit_mut<V: VisitorMut>(&mut self, visitor: &mut V);
 }
 
 // Pointer-like impls
@@ -137,3 +137,31 @@ visit_mut_ptr_impl!(Box<T>);
 visit_mut_ptr_impl!('a, RefMut<'a, T>);
 visit_mut_ptr_impl!('a, MutexGuard<'a, T>);
 visit_mut_ptr_impl!('a, RwLockWriteGuard<'a, T>);
+
+
+
+/// A trait for implementing something that has custom visit functions for a [`Node`].
+pub trait Visitor {
+    /// Visits the given node, using the custom implementation if available or else defaulting to
+    /// the node's [`Visit`] implementation.
+    ///
+    /// # Arguments
+    /// - `node`: The [`Visit`]able [`Node`] to visit.
+    ///
+    /// # Returns
+    fn visit<N: Visit>(&mut self, node: &N);
+}
+
+
+
+/// A trait for implementing something that has custom visit functions for a [`Node`].
+pub trait VisitorMut {
+    /// Visits the given node, using the custom implementation if available or else defaulting to
+    /// the node's [`VisitMut`] implementation.
+    ///
+    /// # Arguments
+    /// - `node`: The [`VisitMut`]able [`Node`] to visit.
+    ///
+    /// # Returns
+    fn visit_mut<N: VisitMut>(&mut self, node: &mut N);
+}
