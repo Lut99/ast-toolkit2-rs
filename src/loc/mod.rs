@@ -429,6 +429,18 @@ impl crate::tree::NodeMut for Loc {
     #[inline(always)]
     fn as_any_mut(&mut self) -> &mut dyn Any { self as &mut dyn Any }
 }
+#[cfg(feature = "visit")]
+impl crate::visit::Visit for Loc {
+    /// Uniformity implementation for `Loc`. Does not visit anything, absolute node leaf.
+    #[inline(always)]
+    fn visit<V: crate::visit::Visitor>(&self, _visitor: &mut V) -> V::Result { crate::visit::Initializable::init() }
+}
+#[cfg(feature = "visit")]
+impl crate::visit::VisitMut for Loc {
+    /// Uniformity implementation for `Loc`. Does not visit anything, absolute node leaf.
+    #[inline(always)]
+    fn visit_mut<V: crate::visit::VisitorMut>(&mut self, _visitor: &mut V) -> V::Result { crate::visit::Initializable::init() }
+}
 
 // Conversion
 impl<A: Located> FromIterator<A> for Loc {

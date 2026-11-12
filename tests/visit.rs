@@ -9,7 +9,7 @@ use std::any::Any;
 
 use ast_toolkit2::loc::{Loc, Located};
 use ast_toolkit2::tree::{Node, NodeMut};
-use ast_toolkit2::visit::{ReplaceWith as _, VisitMut, VisitorMut};
+use ast_toolkit2::visit::{ReplaceWith as _, Visit, VisitMut, Visitor, VisitorMut};
 
 
 /***** AST *****/
@@ -37,6 +37,26 @@ impl NodeMut for Lit {
     #[inline]
     fn as_any_mut(&mut self) -> &mut dyn Any { self as &mut dyn Any }
 }
+impl Visit for Lit {
+    #[inline(always)]
+    fn visit<V: Visitor>(&self, visitor: &mut V) -> V::Result {
+        match self {
+            Self::String(s) => visitor.visit(s),
+            Self::Int64(i) => visitor.visit(i),
+            Self::Int32(i) => visitor.visit(i),
+        }
+    }
+}
+impl VisitMut for Lit {
+    #[inline(always)]
+    fn visit_mut<V: VisitorMut>(&mut self, visitor: &mut V) -> V::Result {
+        match self {
+            Self::String(s) => visitor.visit_mut(s),
+            Self::Int64(i) => visitor.visit_mut(i),
+            Self::Int32(i) => visitor.visit_mut(i),
+        }
+    }
+}
 
 
 
@@ -56,6 +76,14 @@ impl Node for LitString {
 impl NodeMut for LitString {
     #[inline]
     fn as_any_mut(&mut self) -> &mut dyn Any { self as &mut dyn Any }
+}
+impl Visit for LitString {
+    #[inline(always)]
+    fn visit<V: Visitor>(&self, visitor: &mut V) -> V::Result { visitor.visit(&self.loc) }
+}
+impl VisitMut for LitString {
+    #[inline(always)]
+    fn visit_mut<V: VisitorMut>(&mut self, visitor: &mut V) -> V::Result { visitor.visit_mut(&mut self.loc) }
 }
 
 
@@ -77,6 +105,14 @@ impl NodeMut for LitInt64 {
     #[inline]
     fn as_any_mut(&mut self) -> &mut dyn Any { self as &mut dyn Any }
 }
+impl Visit for LitInt64 {
+    #[inline(always)]
+    fn visit<V: Visitor>(&self, visitor: &mut V) -> V::Result { visitor.visit(&self.loc) }
+}
+impl VisitMut for LitInt64 {
+    #[inline(always)]
+    fn visit_mut<V: VisitorMut>(&mut self, visitor: &mut V) -> V::Result { visitor.visit_mut(&mut self.loc) }
+}
 
 
 
@@ -97,6 +133,14 @@ impl NodeMut for LitInt32 {
     #[inline]
     fn as_any_mut(&mut self) -> &mut dyn Any { self as &mut dyn Any }
 }
+impl Visit for LitInt32 {
+    #[inline(always)]
+    fn visit<V: Visitor>(&self, visitor: &mut V) -> V::Result { visitor.visit(&self.loc) }
+}
+impl VisitMut for LitInt32 {
+    #[inline(always)]
+    fn visit_mut<V: VisitorMut>(&mut self, visitor: &mut V) -> V::Result { visitor.visit_mut(&mut self.loc) }
+}
 
 
 
@@ -115,14 +159,19 @@ impl StringifyVisitor {
         });
 
         // Recurse as usual
-        self.visit_mut(node);
+        match node {
+            Lit::String(s) => self.visit_mut(s),
+            Lit::Int64(i) => self.visit_mut(i),
+            Lit::Int32(i) => self.visit_mut(i),
+        }
     }
 }
 impl VisitorMut for StringifyVisitor {
+    type Result = ();
+
     #[inline]
     fn visit_mut<N: VisitMut>(&mut self, node: &mut N) {
-        let any = node.as_any_mut();
-        if let Some(node) = any.downcast_mut::<Lit>() {
+        if let Some(node) = node.as_t_mut::<Lit>() {
             self.visit_lit_mut(node);
         } else {
             node.visit_mut(self);
@@ -138,5 +187,6 @@ impl VisitorMut for StringifyVisitor {
 #[test]
 fn test_visit() {
     let mut ex1 = Lit::Int32(LitInt32 { value: 42, loc: Loc::new() });
-    assert_eq!()
+    StringifyVisitor.visit_lit_mut(&mut ex1);
+    assert_eq!(ex1, Lit::String(LitString { value: "42".into(), loc: Loc::new() }));
 }

@@ -15,6 +15,7 @@
 //
 
 // Modules
+mod composable;
 mod impls;
 mod replace_with;
 
@@ -23,13 +24,14 @@ use std::cell::{Ref, RefMut};
 use std::rc::Rc;
 use std::sync::{Arc, MutexGuard, RwLockReadGuard, RwLockWriteGuard};
 
+pub use composable::{Composable, Initializable};
 pub use replace_with::ReplaceWith;
 
 use crate::tree::{Node, NodeMut};
 
 /// Shorthand for including all the traits of this crate.
 pub mod prelude {
-    pub use super::{ReplaceWith, Visit, VisitMut};
+    pub use super::{Composable, Initializable, ReplaceWith, Visit, VisitMut};
 }
 
 
@@ -37,7 +39,7 @@ pub mod prelude {
 macro_rules! visit_ptr_impl {
     (__impl) => {
         #[inline(always)]
-        fn visit<V: Visitor>(&self, visitor: &mut V) { <T as Visit>::visit(self, visitor) }
+        fn visit<V: Visitor>(&self, visitor: &mut V) -> V::Result { <T as Visit>::visit(self, visitor) }
     };
 
     ('a, $ty:ty) => {
@@ -55,7 +57,7 @@ macro_rules! visit_ptr_impl {
 macro_rules! visit_mut_ptr_impl {
     (__impl) => {
         #[inline(always)]
-        fn visit_mut<V: VisitorMut>(&mut self, visitor: &mut V) { <T as VisitMut>::visit_mut(self, visitor) }
+        fn visit_mut<V: VisitorMut>(&mut self, visitor: &mut V) -> V::Result { <T as VisitMut>::visit_mut(self, visitor) }
     };
 
     ('a, $ty:ty) => {
@@ -81,6 +83,10 @@ macro_rules! visit_mut_ptr_impl {
 ///
 /// This trait allows read-only, by-reference access to the children. See [`VisitMut`] for mutable,
 /// by-reference access or [`VisitOwned`] for consuming, owned access.
+///
+/// # Generics
+/// - `R`: Some [`Default`] and [`Composable`] type that is used to carry results of the visiting
+///   process. A value of `()` means nothing is returned.
 pub trait Visit: Node {
     /// Visits the node "standardly", i.e., traverses its children without visiting the node
     /// itself.
@@ -94,7 +100,7 @@ pub trait Visit: Node {
     ///   node's [`Visit`] implementation.
     ///
     /// # Returns
-    fn visit<V: Visitor>(&self, visitor: &mut V);
+    fn visit<V: Visitor>(&self, visitor: &mut V) -> V::Result;
 }
 
 // Pointer-like impls
@@ -115,6 +121,10 @@ visit_ptr_impl!('a, RwLockWriteGuard<'a, T>);
 ///
 /// This trait allows mutable, by-reference access to the children. See [`Visit`] for read-only,
 /// by-reference access or [`VisitOwned`] for consuming, owned access.
+///
+/// # Generics
+/// - `R`: Some [`Default`] and [`Composable`] type that is used to carry results of the visiting
+///   process. A value of `()` means nothing is returned.
 pub trait VisitMut: NodeMut + Visit {
     /// Visits the node "standardly", i.e., traverses its children without visiting the node
     /// itself.
@@ -128,7 +138,7 @@ pub trait VisitMut: NodeMut + Visit {
     ///   node's [`Visit`] implementation.
     ///
     /// # Returns
-    fn visit_mut<V: VisitorMut>(&mut self, visitor: &mut V);
+    fn visit_mut<V: VisitorMut>(&mut self, visitor: &mut V) -> V::Result;
 }
 
 // Pointer-like impls
@@ -142,6 +152,12 @@ visit_mut_ptr_impl!('a, RwLockWriteGuard<'a, T>);
 
 /// A trait for implementing something that has custom visit functions for a [`Node`].
 pub trait Visitor {
+    /// A type returned by traversal functions of this visitor.
+    ///
+    /// [`Composable`] (and hence [`Default`]) means that you can join two answers of two visiting
+    /// functions and still get a meaningful result. For example, sum two counts.
+    type Result: Composable;
+
     /// Visits the given node, using the custom implementation if available or else defaulting to
     /// the node's [`Visit`] implementation.
     ///
@@ -149,13 +165,19 @@ pub trait Visitor {
     /// - `node`: The [`Visit`]able [`Node`] to visit.
     ///
     /// # Returns
-    fn visit<N: Visit>(&mut self, node: &N);
+    fn visit<N: Visit>(&mut self, node: &N) -> Self::Result;
 }
 
 
 
 /// A trait for implementing something that has custom visit functions for a [`Node`].
 pub trait VisitorMut {
+    /// A type returned by traversal functions of this visitor.
+    ///
+    /// [`Composable`] (and hence [`Default`]) means that you can join two answers of two visiting
+    /// functions and still get a meaningful result. For example, sum two counts.
+    type Result: Composable;
+
     /// Visits the given node, using the custom implementation if available or else defaulting to
     /// the node's [`VisitMut`] implementation.
     ///
@@ -163,5 +185,5 @@ pub trait VisitorMut {
     /// - `node`: The [`VisitMut`]able [`Node`] to visit.
     ///
     /// # Returns
-    fn visit_mut<N: VisitMut>(&mut self, node: &mut N);
+    fn visit_mut<N: VisitMut>(&mut self, node: &mut N) -> Self::Result;
 }

@@ -172,7 +172,7 @@ pub fn handle(item: TokenStream2) -> Result<TokenStream2, Error> {
     let (impl_gen, ty_gen, where_clauses) = generics.split_for_impl();
     let node_mut_impl = if !OuterAttr::has_no_mut(&attrs) {
         quote! {
-            impl #impl_gen ::ast_toolkit2::tree:NodeMut for #ident #ty_gen #where_clauses {
+            impl #impl_gen ::ast_toolkit2::tree::NodeMut for #ident #ty_gen #where_clauses {
                 #[inline(always)]
                 fn as_any_mut(&mut self) -> &mut dyn ::std::any::Any { self as &mut dyn ::std::any::Any }
             }
@@ -183,25 +183,11 @@ pub fn handle(item: TokenStream2) -> Result<TokenStream2, Error> {
 
     // Generate the base node impl
     // NOTE: Inherited this because we need to implement `Located`.
-    let mut res = quote! {
+    Ok(quote! {
         impl #impl_gen ::ast_toolkit2::tree::Node for #ident #ty_gen #where_clauses {
             #[inline(always)]
             fn as_any(&self) -> &dyn ::std::any::Any { self as &dyn ::std::any::Any }
         }
         #node_mut_impl
-    };
-
-    // Then generate the appropriate subtrait
-    if OuterAttr::has_nonterm(&attrs) {
-        res.extend(quote! {
-            impl #impl_gen ::ast_toolkit2::tree::NonTerm for #ident #ty_gen #where_clauses {}
-        });
-    } else {
-        res.extend(quote! {
-            impl #impl_gen ::ast_toolkit2::tree::Term for #ident #ty_gen #where_clauses {}
-        });
-    }
-
-    // Done
-    Ok(res)
+    })
 }

@@ -3,7 +3,7 @@
 //
 //  Description:
 //!   Defines the absolute core interfaces for the AST-toolkit.
-//!   
+//!
 //!   Essentially, this gives you the handles to talk about AST's generically:
 //!   - The [`Node`] defines any node in the tree, be it branches or leaves;
 //!   - The [`NonTerm`] defines branches in the tree, i.e., nodes made up of
@@ -84,11 +84,21 @@ pub trait Node: Located {
     ///
     /// This will allow downcasting/upcasting later. Used internally when visiting.
     fn as_any(&self) -> &dyn Any;
+
+    /// Convenience function that attempts to downcast `self` to `T` by going through [`Any`].
+    ///
+    /// # Generics
+    /// - `T`: The type to attempt to downcast ourself as.
+    ///
+    /// # Returns
+    /// Self downcasted if we were a supertype of `T`, or else [`None`].
+    #[inline]
+    fn as_t<T: 'static>(&self) -> Option<&T> { self.as_any().downcast_ref::<T>() }
 }
 
 // Std impls
 impl<T: 'static + Located> Node for Vec<T> {
-    #[inline]
+    #[inline(always)]
     fn as_any(&self) -> &dyn Any { self as &dyn Any }
 }
 
@@ -116,11 +126,22 @@ pub trait NodeMut: Node {
     ///
     /// This will allow downcasting/upcasting later. Used internally when visiting.
     fn as_any_mut(&mut self) -> &mut dyn Any;
+
+    /// Convenience function that attempts to downcast `self` to `T` mutably by going through
+    /// [`Any`].
+    ///
+    /// # Generics
+    /// - `T`: The type to attempt to downcast ourself as.
+    ///
+    /// # Returns
+    /// Self downcasted if we were a supertype of `T`, or else [`None`].
+    #[inline]
+    fn as_t_mut<T: 'static>(&mut self) -> Option<&mut T> { self.as_any_mut().downcast_mut::<T>() }
 }
 
 // Std impls
 impl<T: 'static + Located> NodeMut for Vec<T> {
-    #[inline]
+    #[inline(always)]
     fn as_any_mut(&mut self) -> &mut dyn Any { self as &mut dyn Any }
 }
 

@@ -8,18 +8,12 @@
 //
 
 use ast_toolkit2::loc::{Loc, Located};
-use ast_toolkit2::tree::{Node, NonTerm, Term};
+use ast_toolkit2::tree::Node;
 
 
 /***** HELPER FUNCTIONS *****/
 /// Asserts whether a type implements [`Node`].
 fn assert_node<T: Node>() {}
-
-/// Asserts whether a type implements [`NonTerm`].
-fn assert_nonterm<T: NonTerm>() {}
-
-/// Asserts whether a type implements [`Term`].
-fn assert_term<T: Term>() {}
 
 
 
@@ -55,78 +49,4 @@ fn test_derive_node_enums() {
     }
 
     assert_node::<EnumSimple>();
-}
-
-
-
-#[test]
-fn test_derive_nonterm_structs() {
-    #[derive(Located, Node)]
-    #[node(nonterm)]
-    pub struct StructSimple {
-        foo: String,
-        loc: Loc,
-    }
-
-    #[derive(Located, Node)]
-    #[node(nonterm)]
-    pub struct TupleSimple(String, #[loc] Loc);
-
-    #[derive(Located, Node)]
-    #[node(nonterm)]
-    pub struct TupleGen<T>(T);
-
-
-    assert_nonterm::<StructSimple>();
-    assert_nonterm::<TupleSimple>();
-    assert_nonterm::<TupleGen<TupleSimple>>();
-}
-
-#[test]
-fn test_derive_nonterm_enums() {
-    #[derive(Located, Node)]
-    #[node(nonterm)]
-    pub enum EnumSimple {
-        Foo { foo: String, loc: Loc },
-        Bar(String, #[loc] Loc),
-    }
-
-    assert_nonterm::<EnumSimple>();
-}
-
-
-
-#[test]
-fn test_derive_term_structs() {
-    #[derive(Located, Node)]
-    #[node(term = "gibberish")]
-    pub struct StructSimple {
-        foo: String,
-        loc: Loc,
-    }
-
-    #[derive(Located, Node)]
-    #[node(term = "gibberish")]
-    pub struct TupleSimple(String, #[loc] Loc);
-
-    #[derive(Located, Node)]
-    #[node(term = "gibberish")]
-    pub struct TupleGen<T>(T);
-
-
-    assert_term::<StructSimple>();
-    assert_term::<TupleSimple>();
-    assert_term::<TupleGen<TupleSimple>>();
-}
-
-#[test]
-fn test_derive_term_enums() {
-    #[derive(Located, Node)]
-    #[node(lit = "gibberish")]
-    pub enum EnumSimple {
-        Foo { foo: String, loc: Loc },
-        Bar(String, #[loc] Loc),
-    }
-
-    assert_term::<EnumSimple>();
 }
