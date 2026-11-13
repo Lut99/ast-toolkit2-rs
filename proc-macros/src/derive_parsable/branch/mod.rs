@@ -43,8 +43,19 @@ pub fn handle_impl(outer_attrs: &[OuterAttr], vis: Visibility, ident: Ident, gen
 
     // Then collect how to generate the formatter & error types for the whole enum
     let pident = identity_path(ident.clone());
-    let fmt = Fmt::new("or", outer_attrs, &pident, &gens, newtys.iter().map(|nt| FmtInfo { parsed_ty: nt.parsed_ty(None, false).into_owned(), parsed_ty_inst: Some(nt.parsed_ty(Some(&error_mod), false).into_owned()), skip: nt.skip() }));
-    let err = Err::new(&pident, &gens, newtys.iter().map(|nt| ErrInfo::new(nt.name(), nt.parsed_ty(None, false).into_owned(), nt.target_ty(), nt.skip())));
+    let fmt = Fmt::new(
+        "or",
+        outer_attrs,
+        &pident,
+        &gens,
+        newtys.iter().map(|nt| FmtInfo {
+            parsed_ty: nt.parsed_ty(None, false).into_owned(),
+            parsed_ty_inst: Some(nt.parsed_ty(Some(&error_mod), false).into_owned()),
+            skip: nt.skip(),
+        }),
+    );
+    let err =
+        Err::new(&pident, &gens, newtys.iter().map(|nt| ErrInfo::new(nt.name(), nt.parsed_ty(None, false).into_owned(), nt.target_ty(), nt.skip())));
 
     // Get some whitespace info
     let (whitespace_init, whitespace_pop) = whitespace_pop_impl("rem", outer_attrs);
@@ -68,28 +79,33 @@ pub fn handle_impl(outer_attrs: &[OuterAttr], vis: Visibility, ident: Ident, gen
     });
 
     // Generate the implementation of every variant
-    let parse_impl: TokenStream2 = newtys.iter().filter(|nt| !nt.skip()).map(|nt| {
-        // Generate the impl
-        let ty = nt.parsed_ty(Some(&error_mod), false);
-        let var_inst = nt.var_inst();
-        let err_fn = err.from_fn(&error_mod_path, nt.var_name());
-        quote! {
-            match <#ty as ::ast_toolkit2::nibble::Parsable<::std::primitive::u8>>::parse(::std::clone::Clone::clone(&input)) {
-                ::std::result::Result::Ok((res, rem)) => return ::std::result::Result::Ok((#var_inst, rem)),
-                ::std::result::Result::Err(::ast_toolkit2::nibble::error::NibbleError::Unmatched(_, _)) => {},
-                ::std::result::Result::Err(::ast_toolkit2::nibble::error::NibbleError::NotEnough(_, needed, loc)) => {
-                    return ::std::result::Result::Err(::ast_toolkit2::nibble::error::NibbleError::NotEnough(
-                        <Self as ::ast_toolkit2::nibble::Parsable<::std::primitive::u8>>::expects(),
-                        needed,
-                        loc,
-                    ))
-                },
-                ::std::result::Result::Err(::ast_toolkit2::nibble::error::NibbleError::Error(err)) => {
-                    return ::std::result::Result::Err(::ast_toolkit2::nibble::error::NibbleError::Error(#err_fn(err)));
-                },
+    let parse_impl: TokenStream2 = newtys
+        .iter()
+        .filter(|nt| !nt.skip())
+        .map(|nt| {
+            // Generate the impl
+            let ty = nt.parsed_ty(Some(&error_mod), false);
+            let var_inst = nt.var_inst();
+            let err_fn = err.from_fn(&error_mod_path, nt.var_name());
+            quote! {
+                match <#ty as ::ast_toolkit2::nibble::Parsable<::std::primitive::u8>>::parse(::std::clone::Clone::clone(&input)) {
+                    ::std::result::Result::Ok((res, rem)) => return ::std::result::Result::Ok((#var_inst, rem)),
+                    ::std::result::Result::Err(::ast_toolkit2::nibble::error::NibbleError::Unmatched(_, _)) => {},
+                    ::std::result::Result::Err(::ast_toolkit2::nibble::error::NibbleError::NotEnough(_, needed, loc)) => {
+                        return ::std::result::Result::Err(::ast_toolkit2::nibble::error::NibbleError::NotEnough(
+                            <Self as ::ast_toolkit2::nibble::Parsable<::std::primitive::u8>>::expects(),
+                            needed,
+                            loc,
+                        ))
+                    },
+                    #[allow(unreachable_code)]
+                    ::std::result::Result::Err(::ast_toolkit2::nibble::error::NibbleError::Error(err)) => {
+                        return ::std::result::Result::Err(::ast_toolkit2::nibble::error::NibbleError::Error(#err_fn(err)));
+                    },
+                }
             }
-        }
-    }).collect();
+        })
+        .collect();
 
     // Prepare generics by inserting the bound
     let mut gens = gens.clone();
@@ -117,7 +133,7 @@ pub fn handle_impl(outer_attrs: &[OuterAttr], vis: Visibility, ident: Ident, gen
                 type Regex = ::ast_toolkit2::nibble::__macros::Regex;
                 #whitespace_init
                 #whitespace_pop
-        
+
                 // Then pop normally
                 #parse_impl
                 ::std::result::Result::Err(::ast_toolkit2::nibble::error::NibbleError::Unmatched(<Self as ::ast_toolkit2::nibble::Parsable<::std::primitive::u8>>::expects(), ::ast_toolkit2::nibble::Slice::error_loc(&input)))
