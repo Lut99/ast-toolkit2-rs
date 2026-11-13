@@ -5,6 +5,8 @@
 //!   Showcases the use of the [`Diagnostic`](derive@Diagnostic)-macro.
 //
 
+use std::fmt::{Display, Formatter, Result as FResult};
+
 use ast_toolkit2::diag::{Annotation, Diag, Diagnostic, Severity, Theme};
 use ast_toolkit2::loc::Loc;
 
@@ -71,6 +73,15 @@ fn test_derive_diagnostic_structs() {
     #[diag(error, code = ("E{f0}"), msg = ("Hello, {f1}"))]
     #[annot(warning, repl<u8> = f2.as_bytes(), msg = ("Goodbye, {f1:?}"), loc = f3)]
     struct TupleFormat(u32, &'static str, &'static str, Loc);
+
+    // Message using Display
+    #[derive(Diagnostic)]
+    #[diag(error)]
+    struct DisplayError;
+    impl Display for DisplayError {
+        #[inline]
+        fn fmt(&self, f: &mut Formatter) -> FResult { write!(f, "This error was display'ed!") }
+    }
 
 
     const ID: u64 = 0;
@@ -162,6 +173,13 @@ fn test_derive_diagnostic_structs() {
             loc:  Loc::encapsulate(ID),
         }],
     });
+    assert_eq!(DisplayError.into_diag(), Diag::<u8> {
+        theme:  Theme::PLAIN,
+        sev:    Severity::Error,
+        code:   None,
+        msg:    "This error was display'ed!".into(),
+        annots: Vec::new(),
+    });
 }
 
 
@@ -203,6 +221,18 @@ fn test_derive_diagnostic_enums() {
         #[diag(error, code = ("E{f0}"), msg = ("Hello, {f1}"))]
         #[annot(warning, repl<u8> = f2, msg = ("Goodbye, {f1:?}"), loc = f3)]
         TupleFormat(u32, &'static str, &'static str, Loc),
+
+        #[diag(error)]
+        DisplayError,
+    }
+    impl Display for Test {
+        #[inline]
+        fn fmt(&self, f: &mut Formatter<'_>) -> FResult {
+            match self {
+                Self::DisplayError => write!(f, "This error was display'ed!"),
+                _ => Ok(()),
+            }
+        }
     }
 
 
@@ -294,5 +324,12 @@ fn test_derive_diagnostic_enums() {
             sev:  Severity::Warning,
             loc:  Loc::encapsulate(ID),
         }],
+    });
+    assert_eq!(Test::DisplayError.into_diag(), Diag::<u8> {
+        theme:  Theme::PLAIN,
+        sev:    Severity::Error,
+        code:   None,
+        msg:    "This error was display'ed!".into(),
+        annots: Vec::new(),
     });
 }

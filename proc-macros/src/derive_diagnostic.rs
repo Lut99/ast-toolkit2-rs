@@ -5,6 +5,8 @@
 //!   Implements the derive macro for `Diagnostic`.
 //
 
+use std::hash::{DefaultHasher, Hasher as _};
+
 use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::{ToTokens, quote};
 use syn::parse::{Parse, ParseStream, Parser as _};
@@ -44,43 +46,40 @@ fn default_elemty() -> Type {
 ///
 /// The boolean indicates whether the fields have names (i.e., struct syntax) or are implicit
 /// (i.e., tuple syntax).
-fn generate_field_expansion(fields: &Fields) -> (bool, TokenStream2) {
-    let mut has_names: bool = false;
+fn generate_field_expansion(fields: &Fields) -> TokenStream2 {
     let fields: Vec<Ident> = fields
         .iter()
         .enumerate()
         .map(|(i, f)| {
             if let Some(ident) = &f.ident {
-                has_names = true;
                 Ident::new(&ident.to_string(), Span::mixed_site())
             } else {
                 Ident::new(&format!("f{i}"), Span::mixed_site())
             }
         })
         .collect();
-
-    (has_names, quote!(#(#fields),*))
+    quote!(#(#fields),*)
 }
 
 /// Generates the field expansion for structs (`let Self { ... } = self`).
 #[inline]
 fn generate_field_expansion_struct(fields: &Fields) -> TokenStream2 {
-    let (has_names, exp) = generate_field_expansion(fields);
-    if has_names {
-        quote! { let Self { #exp } = self; }
-    } else {
-        quote! { let Self ( #exp ) = self; }
+    let exp = generate_field_expansion(fields);
+    match fields {
+        Fields::Named(_) => quote! { let Self { #exp } = self; },
+        Fields::Unnamed(_) => quote! { let Self ( #exp ) = self; },
+        Fields::Unit => TokenStream2::new(),
     }
 }
 
 /// Generates the field expansion for enum variants (`Self::$variant { ... }`).
 #[inline]
 fn generate_field_expansion_variant(variant: &Ident, fields: &Fields) -> TokenStream2 {
-    let (has_names, exp) = generate_field_expansion(fields);
-    if has_names {
-        quote! { Self::#variant { #exp } }
-    } else {
-        quote! { Self::#variant ( #exp ) }
+    let exp = generate_field_expansion(fields);
+    match fields {
+        Fields::Named(_) => quote! { Self::#variant { #exp } },
+        Fields::Unnamed(_) => quote! { Self::#variant ( #exp ) },
+        Fields::Unit => quote! { Self::#variant },
     }
 }
 
@@ -137,16 +136,54 @@ impl VisitMut for IdentVisitor {
     fn visit_lit_str_mut(&mut self, lstr: &mut LitStr) { lstr.set_span(Span::mixed_site()); }
 }
 
-/// Takes a format string, then renders it
-fn render_fstr_as_string_nonopt(exprs: &Punctuated<Expr, Token![,]>) -> TokenStream2 { quote!(::std::format!(#exprs)) }
+/// Takes whether there is a format string for the main message and renders a build  string for it if not.
+struct RenderMsgBuild(Ident, bool);
+impl RenderMsgBuild {
+    #[inline]
+    fn new(ident: &Ident, has_format_string: bool) -> Self {
+        Self(
+            Ident::new(
+                &format!("msg_{:x}", {
+                    let mut hasher = DefaultHasher::new();
+                    hasher.write(ident.to_string().as_bytes());
+                    hasher.finish()
+                }),
+                ident.span(),
+            ),
+            has_format_string,
+        )
+    }
+}
+impl ToTokens for RenderMsgBuild {
+    #[inline]
+    fn to_tokens(&self, tokens: &mut TokenStream2) {
+        if !self.1 {
+            let ident = &self.0;
+            tokens.extend(quote!(let #ident = ::std::string::ToString::to_string(&self);));
+        }
+    }
+}
+/// Takes a format string for the main message and renders it.
+struct RenderMainMsg<'b, 'e>(&'b RenderMsgBuild, &'e Option<Punctuated<Expr, Token![,]>>);
+impl<'b, 'e> ToTokens for RenderMainMsg<'b, 'e> {
+    #[inline]
+    fn to_tokens(&self, tokens: &mut TokenStream2) {
+        match self.1 {
+            Some(exprs) => tokens.extend(quote!(::std::format!(#exprs))),
+            None => {
+                let ident = &self.0.0;
+                tokens.extend(quote!(#ident))
+            },
+        }
+    }
+}
 
-/// Takes an optional format string, then renders it
-fn render_fstr_as_string(exprs: &Option<Punctuated<Expr, Token![,]>>) -> TokenStream2 {
+/// Takes a format string for any other format and renders it.
+///
+/// In contrast to [`render_main_msg()`], this renders something optionally.
+fn render_fstr(exprs: &Option<Punctuated<Expr, Token![,]>>) -> TokenStream2 {
     match exprs {
-        Some(exprs) => {
-            let format = render_fstr_as_string_nonopt(exprs);
-            quote! { ::std::option::Option::Some(#format) }
-        },
+        Some(exprs) => quote! { ::std::option::Option::Some(::std::format!(#exprs)) },
         None => quote! { ::std::option::Option::None },
     }
 }
@@ -290,7 +327,7 @@ struct Diag {
     /// The main severity
     sev:    Severity,
     /// The main message
-    msg:    Punctuated<Expr, Token![,]>,
+    msg:    Option<Punctuated<Expr, Token![,]>>,
     /// The main code
     code:   Option<Punctuated<Expr, Token![,]>>,
     /// A list of annotations
@@ -303,7 +340,7 @@ impl Diag {
             .iter()
             .map(|a| {
                 let asev: Severity = a.sev;
-                let amsg: TokenStream2 = render_fstr_as_string(&a.msg);
+                let amsg: TokenStream2 = render_fstr(&a.msg);
                 let arepl: TokenStream2 = a
                     .repl
                     .as_ref()
@@ -466,7 +503,6 @@ impl Diag {
         // Unwrap the toplevel values
         let sev: Severity =
             sev.ok_or_else(|| Error::new(topspan, "Missing main severity specifier (i.e., `error`, `help`, `suggestion` or `warn`/`warning`)"))?;
-        let mut msg: Punctuated<Expr, Token![,]> = msg.ok_or_else(|| Error::new(topspan, "Missing main message"))?;
         if let Some(loc) = loc {
             // Generate the implicit annotation here
             annots.insert(0, Annot { sev, msg: None, repl: None, loc });
@@ -476,8 +512,10 @@ impl Diag {
         for expr in code.iter_mut().flat_map(Punctuated::iter_mut) {
             syn::visit_mut::visit_expr_mut(&mut IdentVisitor, expr);
         }
-        for expr in msg.iter_mut() {
-            syn::visit_mut::visit_expr_mut(&mut IdentVisitor, expr);
+        if let Some(msg) = &mut msg {
+            for expr in msg.iter_mut() {
+                syn::visit_mut::visit_expr_mut(&mut IdentVisitor, expr);
+            }
         }
         Ok(Diag { elemty, sev, code, msg, annots })
     }
@@ -506,14 +544,16 @@ pub fn handle(item: TokenStream2) -> Result<TokenStream2, Error> {
 
             // Then build
             let sev: Severity = diag.sev;
-            let code: TokenStream2 = render_fstr_as_string(&diag.code);
-            let msg: TokenStream2 = render_fstr_as_string_nonopt(&diag.msg);
+            let code: TokenStream2 = render_fstr(&diag.code);
+            let msg_build = RenderMsgBuild::new(&ident, diag.msg.is_some());
+            let msg = RenderMainMsg(&msg_build, &diag.msg);
             let to_inject: &[&str] = if inject_e { &["__E"] } else { &[] };
             let (impl_gen, ty_gen, where_clauses) = split_for_impl_with_extra(to_inject, &generics);
             Ok(quote! {
                 impl #impl_gen ::ast_toolkit2::diag::Diagnostic<#elemty> for #ident #ty_gen #where_clauses {
                     #[inline]
                     fn into_diag(self) -> ::ast_toolkit2::diag::Diag<#elemty> {
+                        #msg_build
                         #fields;
                         ::ast_toolkit2::diag::Diag {
                             theme: ::ast_toolkit2::diag::Theme::PLAIN,
@@ -547,6 +587,7 @@ pub fn handle(item: TokenStream2) -> Result<TokenStream2, Error> {
             let elemty: Type = elemty.unwrap_or_else(default_elemty);
 
             // Go through each variant
+            let mut msg_build = RenderMsgBuild::new(&ident, true);
             let mut variants: Vec<TokenStream2> = Vec::with_capacity(e.variants.len());
             for (variant, diag) in e.variants.into_iter().zip(diags) {
                 // Generate the variant expansion
@@ -557,8 +598,9 @@ pub fn handle(item: TokenStream2) -> Result<TokenStream2, Error> {
 
                 // Then build the individual match arm
                 let sev: Severity = diag.sev;
-                let code: TokenStream2 = render_fstr_as_string(&diag.code);
-                let msg: TokenStream2 = render_fstr_as_string_nonopt(&diag.msg);
+                let code: TokenStream2 = render_fstr(&diag.code);
+                msg_build.1 &= diag.msg.is_some();
+                let msg = RenderMainMsg(&msg_build, &diag.msg);
                 variants.push(quote! {
                     #match_arm => ::ast_toolkit2::diag::Diag {
                         theme: ::ast_toolkit2::diag::Theme::PLAIN,
@@ -579,6 +621,7 @@ pub fn handle(item: TokenStream2) -> Result<TokenStream2, Error> {
                 impl #impl_gen ::ast_toolkit2::diag::Diagnostic<#elemty> for #ident #ty_gen #where_clauses {
                     #[inline]
                     fn into_diag(self) -> ::ast_toolkit2::diag::Diag<#elemty> {
+                        #msg_build
                         match self {
                             #(#variants)*
                         }
