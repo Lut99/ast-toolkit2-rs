@@ -26,14 +26,14 @@ pub(super) struct LineAnnot<'d, E> {
 
 /***** AUXILLARY *****/
 /// A 2 dimensional version of a [`Range`].
-#[derive(Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Range2D {
     /// The lines that are touched by this range, together with where the line is touched.
     pub lines: Vec<LineRange>,
 }
 
 /// A range only spanning a single line.
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct LineRange {
     /// The line this range lives on.
     pub line: u64,
@@ -63,7 +63,7 @@ pub trait Layouter<E> {
     /// # Returns
     /// A collection of [`Range2D`], one for every [`Range`], describing how it is split over
     /// lines.
-    fn layout(&self, source_id: Option<u64>, ranges: Vec<Range>) -> Vec<Range2D>;
+    fn layout(&self, source_id: u64, ranges: Vec<Range>) -> Vec<Range2D>;
 
     /// Function for rendering the output of the layouting algorithm.
     fn render(&self);
@@ -84,12 +84,9 @@ pub trait Layouter<E> {
 /// A collection of all `annots` sorted by source IDs and line number. Each resulting [`LineAnnot`]
 /// is equivalent to the input [`Annot`]s, excepting that its range is now scoped to a single line.
 /// There may also be more if any original annot spanned multiple lines.
-pub fn s2_layout<'d, E>(
-    layouter: &impl Layouter<E>,
-    annots: HashMap<Option<u64>, Vec<Annot<'d, E>>>,
-) -> HashMap<Option<u64>, HashMap<u64, Vec<LineAnnot<'d, E>>>> {
+pub fn s2_layout<'d, E>(layouter: &impl Layouter<E>, annots: HashMap<u64, Vec<Annot<'d, E>>>) -> HashMap<u64, HashMap<u64, Vec<LineAnnot<'d, E>>>> {
     // Let the layouter do its job
-    let mut res = HashMap::<Option<u64>, HashMap<u64, Vec<LineAnnot<'d, E>>>>::with_capacity(annots.len());
+    let mut res = HashMap::<u64, HashMap<u64, Vec<LineAnnot<'d, E>>>>::with_capacity(annots.len());
     for (source_id, annots) in annots {
         // Compute the range maps
         let ranges = layouter.layout(source_id, annots.iter().map(|a| a.range).collect());

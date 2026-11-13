@@ -4,13 +4,13 @@
 //  Description:
 //!   A second version of the layouting algorithm for `ast-toolkit2`'s
 //!   [`Diag`](super::Diag)s.
-//!   
+//!
 //!   This version observes that "inline" annotations are not projected over
 //!   the source text; instead, they are placed compactly in special lines in
 //!   the output render.
 //!
 //!   This will allow for a lot more virtual computation during layouting.
-//!   
+//!
 //!   # Algorithm
 //!   The steps of the algorithm are as follows:
 //!   1. Split incoming [`Annotation`](super::annots::Annotation) by source ID
@@ -36,6 +36,7 @@
 //
 
 // Modules
+#[cfg(feature = "sources")]
 pub mod layouters;
 mod s1_split;
 mod s2_layout;
@@ -65,7 +66,13 @@ pub struct Display<'l, 'd, L, E> {
 impl<'l, 'd, L: Layouter<E>, E> fmt::Display for Display<'l, 'd, L, E> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FResult {
         // STEP 1: Split
-        let annots = s1_split(&self.diag.annots);
+        let mut annots = s1_split(&self.diag.annots);
+
+        // STEP 1.5: Handle `None` source
+        if let Some(annots) = annots.remove(&None) {
+            todo!()
+        }
+        let annots = annots.into_iter().map(|(k, v)| (k.unwrap(), v)).collect();
 
         // STEP 2: Layout
         let annots = s2_layout(self.layouter, annots);

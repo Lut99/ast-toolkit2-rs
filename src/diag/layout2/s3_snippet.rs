@@ -40,7 +40,7 @@ fn split_vertically<'d, E>(lines: &mut Vec<Line<'d, E>>) -> Vec<Line<'d, E>> {
 /// Represents an entire snippet.
 pub struct Snippet<'d, E> {
     /// The source belonging to this snippet.
-    pub source_id: Option<u64>,
+    pub source_id: u64,
     /// The lines in this snippet.
     pub lines:     Vec<Line<'d, E>>,
 }
@@ -64,7 +64,7 @@ pub struct Line<'d, E> {
 ///
 /// # Returns
 /// A collection of [`Snippet`]s that sort all annotations by snippet, by line.
-pub fn s3_snippet<'d, E>(annots: HashMap<Option<u64>, HashMap<u64, Vec<LineAnnot<'d, E>>>>) -> Vec<Snippet<'d, E>> {
+pub fn s3_snippet<'d, E>(annots: HashMap<u64, HashMap<u64, Vec<LineAnnot<'d, E>>>>) -> Vec<Snippet<'d, E>> {
     // First: split by source
     let mut snippets: Vec<Snippet<'d, E>> = annots
         .into_iter()
