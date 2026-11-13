@@ -8,7 +8,10 @@
 use proc_macro2::{Punct, Spacing, Span, TokenStream as TokenStream2, TokenTree as TokenTree2};
 use quote::ToTokens;
 use syn::punctuated::Punctuated;
-use syn::{GenericParam, Generics, Ident, Path, PathArguments, PathSegment, TraitBound, TypeParamBound};
+use syn::{
+    AngleBracketedGenericArguments, GenericArgument, GenericParam, Generics, Ident, Path, PathArguments, PathSegment, TraitBound, Type,
+    TypeParamBound, TypePath,
+};
 
 
 /***** HELPER *****/
@@ -137,7 +140,7 @@ impl<'g> ToTokens for WhereGen<'g> {
 
 
 /***** LIBRARY *****/
-/// Given a set of [`Generics`], assigns each of them the `Located`-trait.
+/// Given a set of [`Generics`], assigns each of them the given trait.
 ///
 /// # Arguments
 /// - `path`: An iterable of strings that defines the path to add that refers to the
@@ -156,6 +159,62 @@ pub fn inject_trait_bound<const LEN: usize>(path: [&'static str; LEN], gens: &mu
                     let mut segs = Punctuated::new();
                     for path in path {
                         segs.push(PathSegment { ident: Ident::new(path, Span::call_site()), arguments: PathArguments::None });
+                    }
+                    segs
+                },
+            },
+        }))
+    }
+}
+
+/// Given a set of [`Generics`], assigns each of them the given trait.
+///
+/// # Arguments
+/// - `path`: An iterable of strings that defines the path to add that refers to the
+///   to-be-implemented trait.
+/// - `args`: A list of arguments to give to the path.
+/// - `gens`: The [`Generics`] to inject the additional trait bounds in.
+pub fn inject_trait_bound_with_args<const LEN: usize>(path: [&'static str; LEN], args: &[&str], gens: &mut Generics) {
+    for param in gens.type_params_mut() {
+        param.bounds.push(TypeParamBound::Trait(TraitBound {
+            paren_token: None,
+            lifetimes: None,
+            modifiers: Default::default(),
+            maybe: None,
+            path: Path {
+                leading_colon: Some(Default::default()),
+                segments:      {
+                    let mut segs = Punctuated::new();
+                    for path in path {
+                        segs.push(PathSegment {
+                            ident:     Ident::new(path, Span::call_site()),
+                            arguments: PathArguments::AngleBracketed(AngleBracketedGenericArguments {
+                                colon2_token: None,
+                                lt_token: Default::default(),
+                                args: {
+                                    let mut pargs = Punctuated::new();
+                                    for arg in args {
+                                        pargs.push(GenericArgument::Type(Type::Path(TypePath {
+                                            attrs: Vec::new(),
+                                            qself: None,
+                                            path:  Path {
+                                                leading_colon: None,
+                                                segments:      {
+                                                    let mut segs = Punctuated::new();
+                                                    segs.push(PathSegment {
+                                                        ident:     Ident::new(arg, Span::call_site()),
+                                                        arguments: PathArguments::None,
+                                                    });
+                                                    segs
+                                                },
+                                            },
+                                        })));
+                                    }
+                                    pargs
+                                },
+                                gt_token: Default::default(),
+                            }),
+                        });
                     }
                     segs
                 },

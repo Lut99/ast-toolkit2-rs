@@ -71,8 +71,13 @@ fn test_derive_diagnostic_structs() {
     // Tuple formatting
     #[derive(Diagnostic)]
     #[diag(error, code = ("E{f0}"), msg = ("Hello, {f1}"))]
-    #[annot(warning, repl<u8> = f2.as_bytes(), msg = ("Goodbye, {f1:?}"), loc = f3)]
+    #[annot(warning, repl<u8> = {2}.as_bytes(), msg = ("Goodbye, {f1:?}"), loc = {3})]
     struct TupleFormat(u32, &'static str, &'static str, Loc);
+
+    // Tuple default loc testing
+    #[derive(Diagnostic)]
+    #[diag(error, msg = "Foo", loc)]
+    struct TupleDefault(Loc);
 
     // Message using Display
     #[derive(Diagnostic)]
@@ -173,6 +178,13 @@ fn test_derive_diagnostic_structs() {
             loc:  Loc::encapsulate(ID),
         }],
     });
+    assert_eq!(TupleDefault(Loc::encapsulate(ID)).into_diag(), Diag::<u8> {
+        theme:  Theme::PLAIN,
+        sev:    Severity::Error,
+        code:   None,
+        msg:    "Foo".into(),
+        annots: vec![Annotation { repl: None, msg: None, sev: Severity::Error, loc: Loc::encapsulate(ID) }],
+    });
     assert_eq!(DisplayError.into_diag(), Diag::<u8> {
         theme:  Theme::PLAIN,
         sev:    Severity::Error,
@@ -219,8 +231,12 @@ fn test_derive_diagnostic_enums() {
         ComplexFormat { code: u32, world: &'static str, foo: &'static str, loc: Loc },
 
         #[diag(error, code = ("E{f0}"), msg = ("Hello, {f1}"))]
-        #[annot(warning, repl<u8> = f2, msg = ("Goodbye, {f1:?}"), loc = f3)]
+        #[annot(warning, repl<u8> = {2}, msg = ("Goodbye, {f1:?}"), loc = {3})]
         TupleFormat(u32, &'static str, &'static str, Loc),
+
+        // Tuple default loc testing
+        #[diag(error, msg = "Foo", loc)]
+        TupleDefault(Loc),
 
         #[diag(error)]
         DisplayError,
@@ -324,6 +340,13 @@ fn test_derive_diagnostic_enums() {
             sev:  Severity::Warning,
             loc:  Loc::encapsulate(ID),
         }],
+    });
+    assert_eq!(Test::TupleDefault(Loc::encapsulate(ID)).into_diag(), Diag::<u8> {
+        theme:  Theme::PLAIN,
+        sev:    Severity::Error,
+        code:   None,
+        msg:    "Foo".into(),
+        annots: vec![Annotation { repl: None, msg: None, sev: Severity::Error, loc: Loc::encapsulate(ID) }],
     });
     assert_eq!(Test::DisplayError.into_diag(), Diag::<u8> {
         theme:  Theme::PLAIN,

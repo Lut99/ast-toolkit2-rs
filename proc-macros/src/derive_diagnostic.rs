@@ -15,11 +15,11 @@ use syn::spanned::Spanned;
 use syn::token::Paren;
 use syn::visit_mut::VisitMut;
 use syn::{
-    Attribute, Data, DataUnion, DeriveInput, Error, Expr, ExprLit, ExprPath, Fields, Ident, Lit, LitStr, Meta, Path, PathSegment, Token, Type,
-    TypePath, parenthesized,
+    Attribute, Data, DataUnion, DeriveInput, Error, Expr, ExprLit, ExprPath, Fields, Ident, Lit, LitStr, Meta, Path, PathArguments, PathSegment,
+    Stmt, Token, Type, TypePath, parenthesized,
 };
 
-use crate::common::split_for_impl_with_extra;
+use crate::common::{inject_trait_bound_with_args, split_for_impl_with_extra};
 
 
 /***** HELPER FUNCTIONS *****/
@@ -88,9 +88,13 @@ fn parse_fmt_exprs(input: ParseStream) -> Result<Punctuated<Expr, Token![,]>, Er
     fn parenthesized(input: ParseStream) -> Result<(Paren, Punctuated<Expr, Token![,]>), Error> {
         let content;
         let parens = parenthesized!(content in input);
-        let expr: Punctuated<Expr, Token![,]> = Punctuated::parse_terminated(&content)?;
+        let mut expr: Punctuated<Expr, Token![,]> = Punctuated::parse_terminated(&content)?;
         if !content.is_empty() {
             return Err(content.error("Unexpected tokens after expression"));
+        }
+        // Ensure to process `{0}` and such
+        for expr in &mut expr {
+            UnnamedFieldVisitor.visit_expr_mut(expr);
         }
         Ok((parens, expr))
     }
@@ -108,22 +112,13 @@ fn parse_fmt_exprs(input: ParseStream) -> Result<Punctuated<Expr, Token![,]>, Er
 }
 
 /// Parses a loc expressions (either `loc = ...` or just `loc`, which aliases to `loc = loc`).
-fn parse_loc_expr(input: ParseStream) -> Result<Expr, Error> {
+fn parse_loc_expr(input: ParseStream) -> Result<Option<Expr>, Error> {
     if input.parse::<Token![=]>().is_ok() {
-        Ok(input.parse()?)
+        let mut expr = input.parse::<Expr>()?;
+        UnnamedFieldVisitor.visit_expr_mut(&mut expr);
+        Ok(Some(expr))
     } else if input.is_empty() {
-        Ok(Expr::Path(ExprPath {
-            attrs: Vec::new(),
-            qself: None,
-            path:  Path {
-                leading_colon: None,
-                segments:      {
-                    let mut segs = Punctuated::new();
-                    segs.push(PathSegment { ident: Ident::new("loc", Span::mixed_site()), arguments: syn::PathArguments::None });
-                    segs
-                },
-            },
-        }))
+        Ok(None)
     } else {
         Err(input.error("Expected either nothing or `= <expr>`"))
     }
@@ -134,6 +129,34 @@ struct IdentVisitor;
 impl VisitMut for IdentVisitor {
     fn visit_ident_mut(&mut self, ident: &mut Ident) { ident.set_span(Span::mixed_site()); }
     fn visit_lit_str_mut(&mut self, lstr: &mut LitStr) { lstr.set_span(Span::mixed_site()); }
+}
+
+struct UnnamedFieldVisitor;
+impl VisitMut for UnnamedFieldVisitor {
+    fn visit_expr_mut(&mut self, expr: &mut Expr) {
+        // Delve to discover any expression of the shape `{ <LITINT> }`
+        let Expr::Block(block) = expr else { return syn::visit_mut::visit_expr_mut(self, expr) };
+        let [stmt] = block.block.stmts.as_mut_slice() else { return self.visit_expr_block_mut(block) };
+        let Stmt::Expr(inner, _) = stmt else { return self.visit_stmt_mut(stmt) };
+        let Expr::Lit(ExprLit { attrs: _, lit: Lit::Int(lit) }) = inner else { return self.visit_expr_mut(inner) };
+
+        // Translate it into a field identifier
+        *expr = Expr::Path(ExprPath {
+            attrs: block.attrs.drain(..).collect(),
+            qself: None,
+            path:  Path {
+                leading_colon: None,
+                segments:      {
+                    let mut segs = Punctuated::new();
+                    segs.push(PathSegment {
+                        ident:     Ident::new(&format!("f{}", lit.base10_digits()), lit.span()),
+                        arguments: PathArguments::None,
+                    });
+                    segs
+                },
+            },
+        });
+    }
 }
 
 /// Takes whether there is a format string for the main message and renders a build  string for it if not.
@@ -224,7 +247,7 @@ enum DiagAttr {
     /// Defines a message
     Message(Punctuated<Expr, Token![,]>, Span),
     /// Defines an annotation expression
-    Loc(Expr, Span),
+    Loc(Option<Expr>, Span),
 }
 impl DiagAttr {
     /// Does the parsing but without the check for toplevelattr
@@ -271,7 +294,7 @@ enum AnnotAttr {
     /// Defines a replacement
     Replace(Type, Expr, Span),
     /// Defines an annotation expression
-    Loc(Expr, Span),
+    Loc(Option<Expr>, Span),
 }
 impl Parse for AnnotAttr {
     #[inline]
@@ -291,7 +314,9 @@ impl Parse for AnnotAttr {
             let ty: Type = input.parse()?;
             input.parse::<Token![>]>()?;
             input.parse::<Token![=]>()?;
-            Ok(Self::Replace(ty, input.parse::<Expr>()?, ident.span()))
+            let mut expr = input.parse::<Expr>()?;
+            UnnamedFieldVisitor.visit_expr_mut(&mut expr);
+            Ok(Self::Replace(ty, expr, ident.span()))
         } else if ident == "msg" || ident == "message" {
             // Then do the equals-value thingy
             input.parse::<Token![=]>()?;
@@ -360,12 +385,12 @@ impl Diag {
     }
 
     /// Parses the VariantAttrs from a given list of attributes.
-    fn parse_from_attrs(topspan: Span, attrs: &[Attribute]) -> Result<Self, Error> {
+    fn parse_from_attrs(topspan: Span, has_named_fields: bool, attrs: &[Attribute]) -> Result<Self, Error> {
         let mut elemty: Option<Type> = None;
         let mut sev: Option<Severity> = None;
         let mut code: Option<Punctuated<Expr, Token![,]>> = None;
         let mut msg: Option<Punctuated<Expr, Token![,]>> = None;
-        let mut loc: Option<Expr> = None;
+        let mut loc: Option<Option<Expr>> = None;
         let mut annots: Vec<Annot> = Vec::with_capacity(4);
         for attr in attrs {
             // Filter out our own attributes only
@@ -414,7 +439,7 @@ impl Diag {
                     let mut asev: Option<Severity> = None;
                     let mut amsg: Option<Punctuated<Expr, Token![,]>> = None;
                     let mut arepl: Option<(Type, Expr)> = None;
-                    let mut aloc: Option<Expr> = None;
+                    let mut aloc: Option<Option<Expr>> = None;
 
                     // Good. Now parse the list as meta attributes themselves...
                     let inner: Punctuated<AnnotAttr, Token![,]> = Punctuated::parse_terminated.parse2(l.tokens.clone())?;
@@ -464,8 +489,43 @@ impl Diag {
                     let asev: Severity = asev.ok_or_else(|| {
                         Error::new(l.path.span(), "Missing severity specifier (i.e., `error`, `help`, `suggestion` or `warn`/`warning`)")
                     })?;
-                    let mut aloc: Expr =
-                        aloc.ok_or_else(|| Error::new(l.path.span(), "Missing `loc`-specifier (i.e., `loc = <...>` or `loc` to imply `loc = loc`)"))?;
+                    let mut aloc: Expr = aloc
+                        .ok_or_else(|| Error::new(l.path.span(), "Missing `loc`-specifier (i.e., `loc = <...>` or `loc` to imply `loc = loc`)"))?
+                        .unwrap_or_else(|| {
+                            if has_named_fields {
+                                Expr::Path(ExprPath {
+                                    attrs: Vec::new(),
+                                    qself: None,
+                                    path:  Path {
+                                        leading_colon: None,
+                                        segments:      {
+                                            let mut segs = Punctuated::new();
+                                            segs.push(PathSegment {
+                                                ident:     Ident::new("loc", Span::mixed_site()),
+                                                arguments: syn::PathArguments::None,
+                                            });
+                                            segs
+                                        },
+                                    },
+                                })
+                            } else {
+                                Expr::Path(ExprPath {
+                                    attrs: Vec::new(),
+                                    qself: None,
+                                    path:  Path {
+                                        leading_colon: None,
+                                        segments:      {
+                                            let mut segs = Punctuated::new();
+                                            segs.push(PathSegment {
+                                                ident:     Ident::new("f0", Span::mixed_site()),
+                                                arguments: syn::PathArguments::None,
+                                            });
+                                            segs
+                                        },
+                                    },
+                                })
+                            }
+                        });
 
                     // Add the annotations
                     for expr in amsg.iter_mut().flat_map(Punctuated::iter_mut) {
@@ -504,6 +564,36 @@ impl Diag {
         let sev: Severity =
             sev.ok_or_else(|| Error::new(topspan, "Missing main severity specifier (i.e., `error`, `help`, `suggestion` or `warn`/`warning`)"))?;
         if let Some(loc) = loc {
+            let loc = loc.unwrap_or_else(|| {
+                if has_named_fields {
+                    Expr::Path(ExprPath {
+                        attrs: Vec::new(),
+                        qself: None,
+                        path:  Path {
+                            leading_colon: None,
+                            segments:      {
+                                let mut segs = Punctuated::new();
+                                segs.push(PathSegment { ident: Ident::new("loc", Span::mixed_site()), arguments: syn::PathArguments::None });
+                                segs
+                            },
+                        },
+                    })
+                } else {
+                    Expr::Path(ExprPath {
+                        attrs: Vec::new(),
+                        qself: None,
+                        path:  Path {
+                            leading_colon: None,
+                            segments:      {
+                                let mut segs = Punctuated::new();
+                                segs.push(PathSegment { ident: Ident::new("f0", Span::mixed_site()), arguments: syn::PathArguments::None });
+                                segs
+                            },
+                        },
+                    })
+                }
+            });
+
             // Generate the implicit annotation here
             annots.insert(0, Annot { sev, msg: None, repl: None, loc });
         }
@@ -528,11 +618,11 @@ impl Diag {
 /***** LIBRARY *****/
 /// Main handler for the macro.
 pub fn handle(item: TokenStream2) -> Result<TokenStream2, Error> {
-    let DeriveInput { attrs, ident, data, generics, .. } = syn::parse2(item)?;
+    let DeriveInput { attrs, ident, data, mut generics, .. } = syn::parse2(item)?;
     match data {
         Data::Struct(s) => {
             // Parse toplevel attributes first
-            let diag = Diag::parse_from_attrs(ident.span(), &attrs)?;
+            let diag = Diag::parse_from_attrs(ident.span(), matches!(s.fields, Fields::Named(_)), &attrs)?;
             let inject_e: bool = diag.elemty.is_none();
             let elemty: Type = diag.elemty.clone().unwrap_or_else(default_elemty);
 
@@ -548,6 +638,7 @@ pub fn handle(item: TokenStream2) -> Result<TokenStream2, Error> {
             let msg_build = RenderMsgBuild::new(&ident, diag.msg.is_some());
             let msg = RenderMainMsg(&msg_build, &diag.msg);
             let to_inject: &[&str] = if inject_e { &["__E"] } else { &[] };
+            inject_trait_bound_with_args(["ast_toolkit2", "diag", "Diagnostic"], to_inject, &mut generics);
             let (impl_gen, ty_gen, where_clauses) = split_for_impl_with_extra(to_inject, &generics);
             Ok(quote! {
                 impl #impl_gen ::ast_toolkit2::diag::Diagnostic<#elemty> for #ident #ty_gen #where_clauses {
@@ -569,7 +660,11 @@ pub fn handle(item: TokenStream2) -> Result<TokenStream2, Error> {
             })
         },
         Data::Enum(e) => {
-            let diags = e.variants.iter().map(|v| Diag::parse_from_attrs(v.ident.span(), &v.attrs)).collect::<Result<Vec<Diag>, Error>>()?;
+            let diags = e
+                .variants
+                .iter()
+                .map(|v| Diag::parse_from_attrs(v.ident.span(), matches!(v.fields, Fields::Named(_)), &v.attrs))
+                .collect::<Result<Vec<Diag>, Error>>()?;
             let mut elemty: Option<Type> = None;
             for diag in &diags {
                 // Parse toplevel attributes first

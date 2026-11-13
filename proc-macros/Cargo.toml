@@ -23,7 +23,7 @@ quote = { version = "1.0.0", default-features = false, optional = true }
 default = []
 
 # Functionality
-diag = ["dep:proc-macro2", "dep:syn", "dep:quote", "syn/clone-impls", "syn/derive", "syn/extra-traits", "syn/visit-mut"]
+diag = ["dep:proc-macro2", "dep:syn", "dep:quote", "syn/clone-impls", "syn/derive", "syn/extra-traits", "syn/full", "syn/visit-mut"]
 loc = ["dep:proc-macro2", "dep:syn", "dep:quote", "syn/derive", "syn/printing"]
 nibble = ["dep:convert_case", "dep:proc-macro2", "dep:syn", "dep:quote", "syn/clone-impls", "syn/derive", "syn/printing"]
 tree = ["dep:convert_case", "dep:proc-macro2", "dep:syn", "dep:quote", "syn/clone-impls"]
