@@ -9,6 +9,29 @@ use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 
 
+/***** HELPER MACROS *****/
+macro_rules! initializable_primitive_impl {
+    ($ty:ty, $value:expr) => {
+        impl Initializable for $ty {
+            #[inline(always)]
+            fn init() -> Self { $value }
+        }
+    };
+}
+
+macro_rules! composable_primitive_impl {
+    ($ty:ty) => {
+        impl Composable for $ty {
+            #[inline(always)]
+            fn compose_with(&mut self, other: Self) { *self += other }
+        }
+    };
+}
+
+
+
+
+
 /***** LIBRARY *****/
 /// Defines a type can start composition of results to traversals.
 ///
@@ -29,10 +52,21 @@ impl<T: Initializable> Initializable for Box<T> {
 }
 
 // Std impls
-impl Initializable for () {
-    #[inline(always)]
-    fn init() -> Self { () }
-}
+initializable_primitive_impl!(u8, 0);
+initializable_primitive_impl!(u16, 0);
+initializable_primitive_impl!(u32, 0);
+initializable_primitive_impl!(u64, 0);
+initializable_primitive_impl!(u128, 0);
+initializable_primitive_impl!(usize, 0);
+initializable_primitive_impl!(i8, 0);
+initializable_primitive_impl!(i16, 0);
+initializable_primitive_impl!(i32, 0);
+initializable_primitive_impl!(i64, 0);
+initializable_primitive_impl!(i128, 0);
+initializable_primitive_impl!(isize, 0);
+initializable_primitive_impl!(f32, 0.0);
+initializable_primitive_impl!(f64, 0.0);
+initializable_primitive_impl!((), ());
 
 impl<T> Initializable for Option<T> {
     #[inline(always)]
@@ -82,6 +116,20 @@ impl<T: Composable> Composable for Box<T> {
 }
 
 // Std impls
+composable_primitive_impl!(u8);
+composable_primitive_impl!(u16);
+composable_primitive_impl!(u32);
+composable_primitive_impl!(u64);
+composable_primitive_impl!(u128);
+composable_primitive_impl!(usize);
+composable_primitive_impl!(i8);
+composable_primitive_impl!(i16);
+composable_primitive_impl!(i32);
+composable_primitive_impl!(i64);
+composable_primitive_impl!(i128);
+composable_primitive_impl!(isize);
+composable_primitive_impl!(f32);
+composable_primitive_impl!(f64);
 impl Composable for () {
     #[inline(always)]
     fn compose_with(&mut self, _other: Self) {}

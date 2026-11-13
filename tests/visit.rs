@@ -181,12 +181,37 @@ impl VisitorMut for StringifyVisitor {
 
 
 
+struct ValueVisitor;
+impl ValueVisitor {
+    fn visit_lit_int32(&mut self, node: &LitInt32) -> u64 { node.value as u64 }
+    fn visit_lit_int64(&mut self, node: &LitInt64) -> u64 { node.value }
+}
+impl Visitor for ValueVisitor {
+    type Result = u64;
+
+    #[inline]
+    fn visit<N: Visit>(&mut self, node: &N) -> Self::Result {
+        if let Some(node) = node.as_t::<LitInt32>() {
+            self.visit_lit_int32(node)
+        } else if let Some(node) = node.as_t::<LitInt64>() {
+            self.visit_lit_int64(node)
+        } else {
+            node.visit(self)
+        }
+    }
+}
+
+
+
 
 
 /***** TESTS *****/
 #[test]
 fn test_visit() {
     let mut ex1 = Lit::Int32(LitInt32 { value: 42, loc: Loc::new() });
-    StringifyVisitor.visit_lit_mut(&mut ex1);
+    StringifyVisitor.visit_mut(&mut ex1);
     assert_eq!(ex1, Lit::String(LitString { value: "42".into(), loc: Loc::new() }));
+
+    let ex2 = Lit::Int64(LitInt64 { value: 42, loc: Loc::new() });
+    assert_eq!(ValueVisitor.visit(&ex2), 42);
 }
