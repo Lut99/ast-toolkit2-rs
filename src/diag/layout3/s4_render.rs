@@ -5,25 +5,23 @@
 //!   Defines the fourth step in the [layouting algorithm](super).
 //
 
-use std::fmt::{Display, Formatter, Result as FResult};
+use std::borrow::Cow;
+use std::fmt::{self, Display, Formatter, Result as FResult};
 use std::marker::PhantomData;
 
-use super::super::themes::Theme;
+use console::Style;
+
+use super::super::annots::Severity;
+use super::super::themes::{SourceTheme, Theme};
 use super::layouter::Layouter;
-use super::s3_place::AnnotatedMessage;
+use super::s3_place::{AnnotatedMessage, AnnotatedSnippet};
 
 
 /***** HELPERS *****/
-struct RenderLoc<'l, L, E>(u64, u64, &'l L, PhantomData<E>);
-impl<'l, L: Layouter<E>, E> Display for RenderLoc<'l, L, E> {
-    #[inline(always)]
-    fn fmt(&self, f: &mut Formatter<'_>) -> FResult { self.2.render_loc(f, self.0, self.1) }
-}
-
-struct RenderReplace<'l, L, E>(u64, &'l L, PhantomData<E>);
-impl<'l, L: Layouter<E>, E> Display for RenderReplace<'l, L, E> {
-    #[inline(always)]
-    fn fmt(&self, f: &mut Formatter<'_>) -> FResult { self.1.render_replace(f, self.0) }
+struct Fmt<F>(F);
+impl<F: for<'a, 'b> Fn(&'a mut Formatter<'b>) -> FResult> Display for Fmt<F> {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter<'_>) -> FResult { (self.0)(f) }
 }
 
 
@@ -41,7 +39,7 @@ impl<'l, L: Layouter<E>, E> Display for RenderReplace<'l, L, E> {
 ///
 /// # Returns
 /// A new list of messages with rendered annotations attached.
-pub fn s4_render<'t, 'd, E>(f: &mut Formatter<'_>, theme: &'t Theme, layouter: &impl Layouter<E>, msgs: Vec<AnnotatedMessage<'t, 'd, E>>) -> FResult {
+pub fn s4_render<'d, E>(f: &mut fmt::Formatter<'_>, theme: &'d Theme, layouter: &impl Layouter<E>, msgs: Vec<AnnotatedMessage<'d, E>>) -> FResult {
     // Show everything in-order!
     for msg in msgs {
         match msg {
@@ -55,7 +53,7 @@ pub fn s4_render<'t, 'd, E>(f: &mut Formatter<'_>, theme: &'t Theme, layouter: &
             // <line> | <snippet>
             //        |
             //        = note: <note>
-            AnnotatedMessage::Main(m) => continue,
+            AnnotatedMessage::Main(m) => todo!(),
 
             // <severity>: <msg>
             //   --> <file>:<line>:<col>
@@ -70,9 +68,8 @@ pub fn s4_render<'t, 'd, E>(f: &mut Formatter<'_>, theme: &'t Theme, layouter: &
                 let loc_style = &theme.header_loc;
 
                 let largest_line = m.lines.iter().map(|l| l.line + 1).max().unwrap_or(0);
-                let line_maxwidth = 1 + largest_line.ilog10() as usize;
-
-                let source = RenderReplace(m.source_id, layouter, PhantomData::<E>).to_string();
+                // let line_maxwidth = 1 + largest_line.ilog10() as usize;
+                let line_maxwidth = layouter.line_no_width(largest_line);
 
                 writeln!(f, "{}{}", sev_style.apply_to(m.sev.as_str()), msg_style.apply_to(format!(": {}", m.msg)))?;
                 writeln!(
@@ -80,13 +77,29 @@ pub fn s4_render<'t, 'd, E>(f: &mut Formatter<'_>, theme: &'t Theme, layouter: &
                     "{:>line_maxwidth$}{} {}",
                     "",
                     scaffolding_style.apply_to("-->"),
-                    loc_style.apply_to(RenderLoc(m.source_id, m.pos, layouter, PhantomData::<E>))
+                    loc_style.apply_to(Fmt(|f| layouter.render_loc(f, m.source_id, m.pos)))
                 )?;
                 writeln!(f, "{:>line_maxwidth$} {}", "", scaffolding_style.apply_to("|"))?;
-                for (i, line) in source.lines().enumerate() {
-                    let l = ();
-                    writeln!(f, "{:>line_maxwidth$} {}", "", scaffolding_style.apply_to("|"))?;
+                for line in &m.lines {
+                    // Write the source line
+                    writeln!(
+                        f,
+                        "{:>line_maxwidth$} {} {}",
+                        Fmt(|f| layouter.render_line_no(f, &theme.header_line_number, line.line)),
+                        scaffolding_style.apply_to("-"),
+                        Fmt(|f| layouter.render_line(f, theme.replace_theme(false), m.source_id, line.line, line.range))
+                    )?;
                 }
+                // for line in m.lines {
+                //     // Write the replacing line
+                //     writeln!(
+                //         f,
+                //         "{:>line_maxwidth$} {} {}",
+                //         Fmt(|f| layouter.render_line_no(f, &theme.header_line_number, line.line)),
+                //         scaffolding_style.apply_to("+"),
+                //         Fmt(|f| layouter.render_line_replaced(f, theme.replace_theme(true), m.source_id, line.line, line.range, m.repl))
+                //     )?;
+                // }
                 writeln!(f, "{:>line_maxwidth$} {}", "", scaffolding_style.apply_to("|"))?;
             },
 

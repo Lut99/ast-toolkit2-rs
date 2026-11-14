@@ -16,7 +16,7 @@
 //!      original source text. After this step, all ranges are local to a line
 //!      and relative to the start of it.
 //!   3. Run the placement algorithm for markers & messages associated to
-//!      annotations. This is rendered to a buffer which then...
+//!      annotations. This is rendered to a buffer for writing later.
 //!   4. Render each message using the [`Layouter`] again.
 //
 
@@ -37,6 +37,10 @@ use s3_place::s3_place;
 use s4_render::s4_render;
 
 use super::Diag;
+
+pub mod state {
+    pub use super::s4_render::{MessageRenderer, SnippetRenderer};
+}
 
 
 /***** LIBRARY *****/

@@ -8,6 +8,9 @@
 use std::fmt::{Formatter, Result as FResult};
 use std::hash::{BuildHasher, RandomState};
 
+use console::Style;
+
+use super::super::super::themes::SourceTheme;
 use super::{Layouter, LineRange, Range2D};
 use crate::loc::Range;
 use crate::sources::Sources;
@@ -35,7 +38,15 @@ impl<'s, 'r, R> HexLayouter<'s, 'r, R> {
 }
 
 // Layouter
+impl<'s, 'r, R> HexLayouter<'s, 'r, R> {
+    /// Computes the size of a line number.
+    #[inline(always)]
+    const fn line_number_width(line: u64) -> usize { if line > 0 { 1 + line.ilog2() as usize / 4 } else { 1 } }
+}
 impl<'s, 'r, R: BuildHasher> Layouter<u8> for HexLayouter<'s, 'r, R> {
+    #[inline(always)]
+    fn line_no_width(&self, line: u64) -> usize { if line > 0 { 1 + line.ilog2() as usize / 4 } else { 1 } }
+
     #[inline(always)]
     fn max_width(&self) -> usize { self.max_width }
 
@@ -87,8 +98,111 @@ impl<'s, 'r, R: BuildHasher> Layouter<u8> for HexLayouter<'s, 'r, R> {
 
     #[inline]
     #[track_caller]
-    fn render_line(&self, f: &mut Formatter<'_>, source_id: u64, line: u64) -> FResult {}
+    fn render_line(&self, f: &mut Formatter<'_>, theme: SourceTheme, source_id: u64, line: u64, range: (usize, usize)) -> FResult {
+        // Example row - 00 01 02 03  04 05 06 07  08 09 0A 0B  0C 0D 0E 0F    ..Hello,world!.-
+
+        // Find the line
+        let line_start = 16 * line;
+        let line_end = line_start + 16;
+        let line: &[u8] = self
+            .sources
+            .slice(source_id, line_start..line_end)
+            .unwrap_or_else(|| panic!("Please call `Sources::load({source_id}, {line_start}..{line_end})` first before rendering"));
+
+        // Write the lines with correct spacing and whatnot
+        for i in 0..16 {
+            // Write the preceding space
+            if i > 0 {
+                if i % 4 == 0 {
+                    write!(f, " ")?;
+                }
+                write!(f, " ")?;
+            }
+
+            // Write with the correct styling
+            if let Some(b) = line.get(i) {
+                let style = if i >= range.0 && i < range.0 + range.1 { theme.highlight_style() } else { theme.base_style() };
+                write!(f, "{:02x}", style.apply_to(b))?;
+            } else {
+                write!(f, "  ")?;
+            }
+        }
+
+        // Write the ascii part
+        write!(f, "    ")?;
+        for i in 0..16 {
+            if let Some(b) = line.get(i) {
+                let c = char::from_u32(*b as u32).unwrap_or('.');
+                let style = if i >= range.0 && i < range.0 + range.1 { theme.highlight_style() } else { theme.base_style() };
+                write!(f, "{}", style.apply_to(c))?;
+            } else {
+                write!(f, " ")?;
+            }
+        }
+
+        // Done
+        Ok(())
+    }
+
+    #[inline]
+    fn render_line_no(&self, f: &mut Formatter<'_>, style: &Style, line: u64) -> FResult { write!(f, "{}", style.apply_to(format!("{line:X}"))) }
+
+    //     #[inline]
+    //     fn render_line_replaced(
+    //         &self,
+    //         f: &mut Formatter<'_>,
+    //         theme: SourceTheme,
+    //         source_id: u64,
+    //         line: u64,
+    //         range: (usize, usize),
+    //         repl: &[u8],
+    //     ) -> FResult {
+    //         // Example row - 00 01 02 03  04 05 06 07  08 09 0A 0B  0C 0D 0E 0F    ..Hello,world!.-
+    //
+    //         // Find the line
+    //         let line_start = 16 * line;
+    //         let line_end = (line_start as i64 + 16 + diff as i64).max(line_start as i64) as u64;
+    //         let line: &[u8] = self
+    //             .sources
+    //             .slice(source_id, line_start..line_end)
+    //             .unwrap_or_else(|| panic!("Please call `Sources::load({source_id}, {line_start}..{line_end})` first before rendering"));
+    //
+    //         // Write the lines with correct spacing and whatnot
+    //         for i in 0..16 {
+    //             // Write the preceding space
+    //             if i > 0 {
+    //                 if i % 4 == 0 {
+    //                     write!(f, " ")?;
+    //                 }
+    //                 write!(f, " ")?;
+    //             }
+    //
+    //             // Write with the correct styling
+    //             if let Some(b) = line.get(i) {
+    //                 let style = if i >= range.0 && i < range.0 + range.1 { theme.highlight_style() } else { theme.base_style() };
+    //                 write!(f, "{:02x}", style.apply_to(b))?;
+    //             } else {
+    //                 write!(f, "  ")?;
+    //             }
+    //         }
+    //
+    //         // Write the ascii part
+    //         write!(f, "    ")?;
+    //         for i in 0..16 {
+    //             if let Some(b) = line.get(i) {
+    //                 let c = char::from_u32(*b as u32).unwrap_or('.');
+    //                 let style = if i >= range.0 && i < range.0 + range.1 { theme.highlight_style() } else { theme.base_style() };
+    //                 write!(f, "{}", style.apply_to(c))?;
+    //             } else {
+    //                 write!(f, " ")?;
+    //             }
+    //         }
+    //
+    //         // Done
+    //         Ok(())
+    //     }
 }
+
 
 
 

@@ -31,6 +31,17 @@ pub enum Error {
     /// Failed to seek in a given reader.
     ReaderSeek { name: String, err: std::io::Error },
 }
+impl Error {
+    /// Returns the inner [`std::io::Error`].
+    #[inline(always)]
+    pub fn into_io_error(self) -> std::io::Error {
+        match self {
+            Self::FileOpen { path: _, err } => err,
+            Self::ReaderRead { name: _, err } => err,
+            Self::ReaderSeek { name: _, err } => err,
+        }
+    }
+}
 impl Display for Error {
     #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> FResult {
@@ -301,7 +312,7 @@ impl<'r, H: BuildHasher> Sources<'r, H> {
     /// # Panics
     /// This function panics if it didn't know the given `id`. Use [`Sources::contains_id()`] to
     /// manually check if beforehand if you need to.
-    pub fn load<'s>(&'s mut self, id: u64, range: impl Into<Range>) -> Result<&'s [u8], Error> {
+    pub fn load(&mut self, id: u64, range: impl Into<Range>) -> Result<&[u8], Error> {
         let mut range: Range = range.into();
 
         // Step 1: Check if we have cached the requested area
@@ -413,6 +424,43 @@ impl<'r, H: BuildHasher> Sources<'r, H> {
 
 // Collection - access
 impl<'r, H: BuildHasher> Sources<'r, H> {
+    /// Returns a cached line of source text.
+    ///
+    /// This is the non-mutable, infallible version of [`Sources::load()`]. Call that one before
+    /// this one if you're reading from files that need to be loaded first.
+    ///
+    /// # Arguments
+    /// - `id`: The ID of the source text to load.
+    /// - `range`: Some [`Range`] to load from a source text. Use [`Range::full()`] if you want to
+    ///   load everything.
+    ///
+    /// # Returns
+    /// A slice to the cached line, or [`None`] if `id` is unknown or if we hadn't loaded (part of)
+    /// the requested slice yet.
+    #[inline]
+    pub fn slice(&self, id: u64, range: impl Into<Range>) -> Option<&[u8]> {
+        let mut range: Range = range.into();
+
+        // Check if we have cached the requested area
+        let s = self.sources.find(id, Source::is(id))?;
+        range = range.contextualize(s.len);
+
+        // Then see if we have a fitting cache line
+        if let Some((loaded, text)) = &s.cache {
+            if loaded.overarches(range) {
+                let pos: usize = (range.pos - loaded.pos) as usize;
+                let len: usize = range.len.fixed() as usize;
+                Some(&text[pos..pos + len])
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
+
+
     /// Returns the ID that was assigned to the given name.
     ///
     /// # Arguments
@@ -534,6 +582,57 @@ impl<'r, H: BuildHasher> Sources<'r, H> {
     #[inline]
     pub fn capacity(&self) -> usize { self.sources.capacity() }
 }
+
+// Nibble
+#[cfg(feature = "nibble")]
+impl<'r, H: BuildHasher> Sources<'r, H> {
+    /// Returns a reference to a slice of a source text in a Sources, as a
+    /// [`Slice`](crate::nibble::Slice).
+    ///
+    /// See [`Sources::load()`] for more information.
+    ///
+    /// # Arguments
+    /// - `id`: The ID of the source text to load.
+    /// - `range`: Some [`Range`] to load from a source text. Use [`Range::full()`] if you want to
+    ///   load everything.
+    ///
+    /// # Returns
+    /// A reference to the loaded source snippet as a [`Slice`](crate::nibble::Slice).
+    ///
+    /// # Errors
+    /// This function may error if we needed to load from a reader and the reader failed.
+    ///
+    /// # Panics
+    /// This function panics if it didn't know the given `id`. Use [`Sources::contains_id()`] to
+    /// manually check if beforehand if you need to.
+    #[inline]
+    pub fn load_slice<'s>(&'s mut self, id: u64, range: impl Into<Range>) -> Result<crate::nibble::Slice<'s, u8>, Error> {
+        // Load the slice
+        let text: &'s [u8] = self.load(id, range)?;
+
+        // Wrap it in a slice
+        Ok(crate::nibble::Slice::with_raw_id(id, text))
+    }
+
+    /// Returns a cached line of source text.
+    ///
+    /// This is the non-mutable, infallible version of [`Sources::load_slice()`]. Call that one
+    /// before this one if you're reading from files that need to be loaded first.
+    ///
+    /// # Arguments
+    /// - `id`: The ID of the source text to load.
+    /// - `range`: Some [`Range`] to load from a source text. Use [`Range::full()`] if you want to
+    ///   load everything.
+    ///
+    /// # Returns
+    /// A [`Slice`](crate::nibble::Slice) to the cached line, or [`None`] if `id` is unknown or if
+    /// we hadn't loaded (part of) the requested slice yet.
+    #[inline]
+    pub fn slice_slice(&self, id: u64, range: impl Into<Range>) -> Option<crate::nibble::Slice<'_, u8>> {
+        Some(crate::nibble::Slice::with_raw_id(id, self.slice(id, range)?))
+    }
+}
+
 
 
 

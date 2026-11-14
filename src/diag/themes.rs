@@ -13,6 +13,45 @@ use console::Style;
 use crate::diag::Severity;
 
 
+/***** HELPERS *****/
+#[derive(Debug, Clone, Copy)]
+enum HighlightOrReplace {
+    Highlight(Severity),
+    Replace(bool),
+}
+
+
+
+/// A subset of a [`Theme`] that shows the correct styling for highlighting in a snippet.
+#[derive(Debug, Clone, Copy)]
+pub struct SourceTheme<'t> {
+    theme: &'t Theme,
+    how:   HighlightOrReplace,
+}
+
+impl<'t> SourceTheme<'t> {
+    /// Returns the base styling to apply.
+    #[inline]
+    pub const fn base_style(&self) -> &Style { &self.theme.source_base }
+
+    /// Returns the highlight styling to apply.
+    #[inline]
+    pub const fn highlight_style(&self) -> &Style {
+        match self.how {
+            HighlightOrReplace::Highlight(Severity::Error) => &self.theme.source_error,
+            HighlightOrReplace::Highlight(Severity::Help) => &self.theme.source_help,
+            HighlightOrReplace::Highlight(Severity::Suggestion) => &self.theme.source_suggestion,
+            HighlightOrReplace::Highlight(Severity::Warning) => &self.theme.source_warn,
+            HighlightOrReplace::Replace(false) => &self.theme.source_replace_old,
+            HighlightOrReplace::Replace(true) => &self.theme.source_replace_new,
+        }
+    }
+}
+
+
+
+
+
 /***** LIBRARY *****/
 /// Defines a theme for customizing layouting of source snippets with their annotations.
 ///
@@ -37,6 +76,24 @@ pub struct Theme {
     pub header_extra_msg: Style,
     /// The style of the source reference in the header.
     pub header_loc: Style,
+    /// The style of the line nubmer.
+    pub header_line_number: Style,
+
+    // Source
+    /// The style of the basic source text.
+    pub source_base: Style,
+    /// The style of [`Severity::Error`](Severity::Error)-highlighted parts in the source text.
+    pub source_error: Style,
+    /// The style of [`Severity::Help`](Severity::Help)-highlighted parts in the source text.
+    pub source_help: Style,
+    /// The style of [`Severity::Suggestion`](Severity::Suggestion)-highlighted parts in the source text.
+    pub source_suggestion: Style,
+    /// The style of [`Severity::Warning`](Severity::Warning)-highlighted parts in the source text.
+    pub source_warn: Style,
+    /// The style of something that might be replaced.
+    pub source_replace_old: Style,
+    /// The style of something that replaces something else.
+    pub source_replace_new: Style,
 
     // Markers
     /// Marker style for [`Severity::Error`](Severity::Error).
@@ -65,6 +122,15 @@ impl Theme {
         header_main_msg: Style::new(),
         header_extra_msg: Style::new(),
         header_loc: Style::new(),
+        header_line_number: Style::new(),
+
+        source_base: Style::new(),
+        source_error: Style::new(),
+        source_help: Style::new(),
+        source_suggestion: Style::new(),
+        source_warn: Style::new(),
+        source_replace_old: Style::new(),
+        source_replace_new: Style::new(),
 
         marker_error: ('-', Style::new()),
         marker_help: ('^', Style::new()),
@@ -84,6 +150,15 @@ impl Theme {
         header_main_msg: Style::new().bold(),
         header_extra_msg: Style::new(),
         header_loc: Style::new(),
+        header_line_number: Style::new().blue().bold(),
+
+        source_base: Style::new(),
+        source_error: Style::new(),
+        source_help: Style::new(),
+        source_suggestion: Style::new(),
+        source_warn: Style::new(),
+        source_replace_old: Style::new().red().bold(),
+        source_replace_new: Style::new().green().bold(),
 
         marker_error: ('-', Style::new().red().bold()),
         marker_help: ('^', Style::new().cyan().bold()),
@@ -96,6 +171,23 @@ impl Theme {
 
 // Helpers
 impl Theme {
+    /// Returns a helper struct for choosing the correct source styling.
+    ///
+    /// This version assumes the snippet is shown for replacing.
+    ///
+    /// # Arguments
+    /// - `showing_new`: Whether or we are currently showing the old text (false) or the new text
+    ///   (true).
+    ///
+    /// # Returns
+    /// A [`SourceTheme`] that implements methods to get the correct styling.
+    #[inline(always)]
+    pub const fn replace_theme(&self, showing_new: bool) -> SourceTheme<'_> {
+        SourceTheme { theme: self, how: HighlightOrReplace::Replace(showing_new) }
+    }
+
+
+
     /// Returns the marker style for the given severity level.
     #[inline]
     pub const fn header_severity_style(&self, sev: Severity) -> &Style {
@@ -104,6 +196,17 @@ impl Theme {
             Severity::Help => &self.header_help,
             Severity::Suggestion => &self.header_suggestion,
             Severity::Warning => &self.header_warn,
+        }
+    }
+
+    /// Returns the marker style for the given severity level.
+    #[inline]
+    pub const fn source_highlight_style(&self, sev: Severity) -> &Style {
+        match sev {
+            Severity::Error => &self.source_error,
+            Severity::Help => &self.source_help,
+            Severity::Suggestion => &self.source_suggestion,
+            Severity::Warning => &self.source_warn,
         }
     }
 
@@ -137,6 +240,14 @@ impl Debug for Theme {
                 header_main_msg,
                 header_extra_msg,
                 header_loc,
+                header_line_number,
+                source_base,
+                source_error,
+                source_help,
+                source_suggestion,
+                source_warn,
+                source_replace_old,
+                source_replace_new,
                 marker_error,
                 marker_help,
                 marker_suggestion,
@@ -152,6 +263,14 @@ impl Debug for Theme {
             fmt.field("header_main_msg", header_main_msg);
             fmt.field("header_extra_msg", header_extra_msg);
             fmt.field("header_loc", header_loc);
+            fmt.field("header_line_number", header_line_number);
+            fmt.field("source_base", source_base);
+            fmt.field("source_error", source_error);
+            fmt.field("source_help", source_help);
+            fmt.field("source_suggestion", source_suggestion);
+            fmt.field("source_warn", source_warn);
+            fmt.field("source_replace_old", source_replace_old);
+            fmt.field("source_replace_new", source_replace_new);
             fmt.field("marker_error", marker_error);
             fmt.field("marker_help", marker_help);
             fmt.field("marker_suggestion", marker_suggestion);

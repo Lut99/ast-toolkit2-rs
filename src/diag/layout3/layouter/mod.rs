@@ -9,21 +9,26 @@
 #[cfg(feature = "sources")]
 mod hex;
 
+// Imports & Exports
 use std::cell::{Ref, RefMut};
 use std::fmt::{Formatter, Result as FResult};
 use std::rc::Rc;
 use std::sync::{Arc, MutexGuard, RwLockReadGuard, RwLockWriteGuard};
 
+use console::Style;
 #[cfg(feature = "sources")]
 pub use hex::HexLayouter;
 
-// Imports & Exports
+use super::super::themes::SourceTheme;
 use crate::loc::Range;
 
 
 /***** HELPER MACROS *****/
 macro_rules! layouter_ptr_impl {
     (__impl) => {
+        #[inline(always)]
+        fn line_no_width(&self, line: u64) -> usize { <T as Layouter<E>>::line_no_width(self, line) }
+
         #[inline(always)]
         fn max_width(&self) -> usize { <T as Layouter<E>>::max_width(self) }
 
@@ -36,8 +41,13 @@ macro_rules! layouter_ptr_impl {
         fn render_loc(&self, f: &mut Formatter<'_>, source_id: u64, pos: u64) -> FResult { <T as Layouter<E>>::render_loc(self, f, source_id, pos) }
 
         #[inline(always)]
-        fn render_line(&self, f: &mut Formatter<'_>, source_id: u64, line: u64) -> FResult {
-            <T as Layouter<E>>::render_line(self, f, source_id, line)
+        fn render_line(&self, f: &mut Formatter<'_>, theme: SourceTheme, source_id: u64, line: u64, range: (usize, usize)) -> FResult {
+            <T as Layouter<E>>::render_line(self, f, theme, source_id, line, range)
+        }
+
+        #[inline(always)]
+        fn render_line_no(&self, f: &mut Formatter<'_>, style: &Style, line: u64) -> FResult {
+            <T as Layouter<E>>::render_line_no(self, f, style, line)
         }
     };
 
@@ -83,7 +93,10 @@ pub struct LineRange {
 /***** INTERFACES *****/
 /// Represents a way of rendering source text.
 pub trait Layouter<E> {
-    /// Returns the maximum width of every line in the layouter.
+    /// Returns the width of a line number.
+    fn line_no_width(&self, line: u64) -> usize;
+
+    /// Returns the maximum width that the Layouter wants to render.
     fn max_width(&self) -> usize;
 
     /// Turns a set of 1-dimensional [`Range`]s into 2-dimensional [`LineRange`]s.
@@ -104,27 +117,44 @@ pub trait Layouter<E> {
     /// lines.
     fn range_to_2d(&self, source_id: u64, ranges: impl IntoIterator<Item = Range>) -> Vec<Range2D>;
 
-    /// Renders the source information of the given loc.
+    /// Renders the loc-string.
+    ///
+    /// Usually, this is the filename followed by a binary offset or line/column number.
     ///
     /// # Arguments
-    /// - `f`: A [`Formatter`] to render to.
-    /// - `source_id`: The source ID of the source that the loc refers to.
-    /// - `pos`: The position of the error in the source text.
+    /// - `f`: The [`Formatter`] to write to.
+    /// - `source_id`: The ID of the source to point to.
+    /// - `pos`: The position in the file to point to.
     ///
     /// # Errors
     /// This function should only error if it failed to write to `f`.
     fn render_loc(&self, f: &mut Formatter<'_>, source_id: u64, pos: u64) -> FResult;
 
-    /// Renders a line from the source text.
+    /// Renders a single source-line to the output.
+    ///
+    /// Make sure you don't write a newline, that's up to the parent renderer.
     ///
     /// # Arguments
-    /// - `f`: A [`Formatter`] to render to.
-    /// - `source_id`: The source ID of the source that the loc refers to.
-    /// - `line`: The zero-indexed line number to render.
+    /// - `f`: The [`Formatter`] to write to.
+    /// - `source_id`: The ID of the source to point to.
+    /// - `pos`: The position in the file to point to.
     ///
     /// # Errors
     /// This function should only error if it failed to write to `f`.
-    fn render_line(&self, f: &mut Formatter<'_>, source_id: u64, line: u64) -> FResult;
+    fn render_line(&self, f: &mut Formatter<'_>, theme: SourceTheme, source_id: u64, line: u64, range: (usize, usize)) -> FResult;
+
+    /// Renders a single source-line to the output.
+    ///
+    /// Make sure you don't write a newline, that's up to the parent renderer.
+    ///
+    /// # Arguments
+    /// - `f`: The [`Formatter`] to write to.
+    /// - `source_id`: The ID of the source to point to.
+    /// - `pos`: The position in the file to point to.
+    ///
+    /// # Errors
+    /// This function should only error if it failed to write to `f`.
+    fn render_line_no(&self, f: &mut Formatter<'_>, style: &Style, line: u64) -> FResult;
 }
 
 // Pointer-like impls

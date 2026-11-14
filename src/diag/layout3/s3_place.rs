@@ -19,10 +19,10 @@ use crate::diag::layout3::s2_layout::MessageReplace2D;
 
 /***** HELPERS *****/
 /// Defines all possible messages that we will render.
-pub enum AnnotatedMessage<'t, 'd, E> {
+pub enum AnnotatedMessage<'d, E> {
     /// A "standard" message containing a main message and one or more annotations, but with a
     /// source text.
-    Main(AnnotatedMessageMain<'t, 'd>),
+    Main(AnnotatedMessageMain<'d>),
     /// A message with a source text but also that replaces source text.
     Replace(MessageReplace2D<'d, E>),
     /// A message without any source text.
@@ -31,7 +31,7 @@ pub enum AnnotatedMessage<'t, 'd, E> {
 
 
 
-pub struct AnnotatedMessageMain<'t, 'd> {
+pub struct AnnotatedMessageMain<'d> {
     /// The severity of the message.
     pub sev:      Severity,
     /// Any code in the message.
@@ -41,32 +41,32 @@ pub struct AnnotatedMessageMain<'t, 'd> {
     /// The notes in the message.
     pub notes:    Vec<Cow<'d, str>>,
     /// The snippets to show for this message.
-    pub snippets: Vec<AnnotatedSnippet<'t, 'd>>,
+    pub snippets: Vec<AnnotatedSnippet<'d>>,
 }
 
-pub struct AnnotatedSnippet<'t, 'd> {
+pub struct AnnotatedSnippet<'d> {
     /// The source ID of the snippet to show.
     pub source_id: u64,
     /// A single snippet to show. It has one or more annotations to show within it.
-    pub lines:     Vec<AnnotatedSnippetLine<'t, 'd>>,
+    pub lines:     Vec<AnnotatedSnippetLine<'d>>,
 }
 
-pub struct AnnotatedSnippetLine<'t, 'd> {
+pub struct AnnotatedSnippetLine<'d> {
     /// The line number.
     pub line:     u64,
     /// The annotations on this line.
     pub annots:   Vec<Annot2D<'d>>,
     /// The rendered annotations on this line.
-    pub rendered: Vec<RenderedLine<'t, 'd>>,
+    pub rendered: Vec<RenderedLine<'d>>,
 }
 
 
 
-pub struct RenderedLine<'t, 'd> {
+pub struct RenderedLine<'d> {
     /// The sequence of things to draw.
-    pub draw: Vec<Draw<'t, 'd>>,
+    pub draw: Vec<Draw<'d>>,
 }
-impl<'t, 'd> RenderedLine<'t, 'd> {
+impl<'d> RenderedLine<'d> {
     #[inline(always)]
     fn new(max_width: usize) -> Self { Self { draw: vec![Draw::Empty(max_width)] } }
 
@@ -93,7 +93,7 @@ impl<'t, 'd> RenderedLine<'t, 'd> {
         }
     }
 
-    fn try_insert_draw_at(&mut self, draw_pos: usize, draw: Draw<'t, 'd>) -> bool {
+    fn try_insert_draw_at(&mut self, draw_pos: usize, draw: Draw<'d>) -> bool {
         // Find the slot
         let at_end: usize = draw_pos + draw.len();
         let mut pos: usize = 0;
@@ -182,15 +182,15 @@ impl<'t, 'd> RenderedLine<'t, 'd> {
 }
 
 #[derive(Debug, Eq, PartialEq)]
-pub enum Draw<'t, 'd> {
+pub enum Draw<'d> {
     /// It's an empty space of `N` cells.
     Empty(usize),
     /// It's `N` markers with the given color.
-    Marker(char, &'t Style, usize),
+    Marker(char, &'d Style, usize),
     /// It's text of `N` cells with the given style.
-    Text(Cow<'d, str>, &'t Style, usize),
+    Text(Cow<'d, str>, &'d Style, usize),
 }
-impl<'t, 'd> Draw<'t, 'd> {
+impl<'d> Draw<'d> {
     /// The length of the thing drawn, in cells.
     #[inline]
     const fn len(&self) -> usize {
@@ -216,7 +216,7 @@ impl<'t, 'd> Draw<'t, 'd> {
 ///
 /// # Returns
 /// A new list of messages with rendered annotations attached.
-pub fn s3_place<'t, 'd, E>(theme: &'t Theme, layouter: &impl Layouter<E>, msgs: Vec<Message2D<'d, E>>) -> Vec<AnnotatedMessage<'t, 'd, E>> {
+pub fn s3_place<'d, E>(theme: &'d Theme, layouter: &impl Layouter<E>, msgs: Vec<Message2D<'d, E>>) -> Vec<AnnotatedMessage<'d, E>> {
     let max_width: usize = layouter.max_width();
 
     // Go through each message...
