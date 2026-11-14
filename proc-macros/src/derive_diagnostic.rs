@@ -246,6 +246,8 @@ enum DiagAttr {
     Code(Punctuated<Expr, Token![,]>, Span),
     /// Defines a message
     Message(Punctuated<Expr, Token![,]>, Span),
+    /// Defines a note
+    Note(Punctuated<Expr, Token![,]>),
     /// Defines an annotation expression
     Loc(Option<Expr>, Span),
 }
@@ -268,6 +270,10 @@ impl DiagAttr {
             // Then do the equals-value thingy
             input.parse::<Token![=]>()?;
             Ok(Self::Message(parse_fmt_exprs(input)?, ident.span()))
+        } else if ident == "note" {
+            // Then do the equals-value thingy
+            input.parse::<Token![=]>()?;
+            Ok(Self::Note(parse_fmt_exprs(input)?))
         } else if ident == "loc" || ident == "location" {
             // Then do the equals-value thingy
             Ok(Self::Loc(parse_loc_expr(input)?, ident.span()))
@@ -350,11 +356,14 @@ struct Diag {
     elemty: Option<Type>,
 
     /// The main severity
-    sev:    Severity,
+    sev:   Severity,
     /// The main message
-    msg:    Option<Punctuated<Expr, Token![,]>>,
+    msg:   Option<Punctuated<Expr, Token![,]>>,
     /// The main code
-    code:   Option<Punctuated<Expr, Token![,]>>,
+    code:  Option<Punctuated<Expr, Token![,]>>,
+    /// Notes stuck to the message.
+    notes: Vec<Punctuated<Expr, Token![,]>>,
+
     /// A list of annotations
     annots: Vec<Annot>,
 }
@@ -391,6 +400,7 @@ impl Diag {
         let mut code: Option<Punctuated<Expr, Token![,]>> = None;
         let mut msg: Option<Punctuated<Expr, Token![,]>> = None;
         let mut loc: Option<Option<Expr>> = None;
+        let mut notes: Vec<Punctuated<Expr, Token![,]>> = Vec::new();
         let mut annots: Vec<Annot> = Vec::with_capacity(4);
         for attr in attrs {
             // Filter out our own attributes only
@@ -424,6 +434,7 @@ impl Diag {
                                     return Err(Error::new(span, "Conflicting main message specified"));
                                 }
                             },
+                            DiagAttr::Note(dnote) => notes.push(dnote),
                             DiagAttr::Loc(dloc, span) => {
                                 if loc.is_none() {
                                     loc = Some(dloc);
@@ -607,7 +618,7 @@ impl Diag {
                 syn::visit_mut::visit_expr_mut(&mut IdentVisitor, expr);
             }
         }
-        Ok(Diag { elemty, sev, code, msg, annots })
+        Ok(Diag { elemty, sev, code, msg, notes, annots })
     }
 }
 
@@ -628,6 +639,9 @@ pub fn handle(item: TokenStream2) -> Result<TokenStream2, Error> {
 
             // Generate the field expansion of the struct
             let fields: TokenStream2 = generate_field_expansion_struct(&s.fields);
+
+            // Generate the notes
+            let notes: Vec<TokenStream2> = diag.notes.iter().map(|n| quote! { ::std::format!(#n) }).collect();
 
             // Generate individual annotations
             let annots: Vec<TokenStream2> = diag.generate_annots(&elemty);
@@ -652,6 +666,7 @@ pub fn handle(item: TokenStream2) -> Result<TokenStream2, Error> {
                             sev: #sev,
                             code: #code,
                             msg: #msg,
+                            notes: ::std::vec![#(#notes),*],
 
                             annots: ::std::vec![#(#annots),*],
                         }
@@ -688,6 +703,9 @@ pub fn handle(item: TokenStream2) -> Result<TokenStream2, Error> {
                 // Generate the variant expansion
                 let match_arm: TokenStream2 = generate_field_expansion_variant(&variant.ident, &variant.fields);
 
+                // Generate the notes
+                let notes: Vec<TokenStream2> = diag.notes.iter().map(|n| quote! { ::std::format!(#n) }).collect();
+
                 // Generate individual annotations
                 let annots: Vec<TokenStream2> = diag.generate_annots(&elemty);
 
@@ -703,6 +721,7 @@ pub fn handle(item: TokenStream2) -> Result<TokenStream2, Error> {
                         sev: #sev,
                         code: #code,
                         msg: #msg,
+                        notes: ::std::vec![#(#notes),*],
 
                         annots: ::std::vec![#(#annots),*],
                     },

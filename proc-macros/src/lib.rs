@@ -45,6 +45,7 @@ use proc_macro::TokenStream;
 ///     sev:    Severity::Error,
 ///     code:   None,
 ///     msg:    "Failed to do a thing".into(),
+///     notes:  Vec::new(),
 ///     annots: Vec::new(),
 /// }
 /// ```
@@ -117,6 +118,22 @@ use proc_macro::TokenStream;
 /// ```
 /// You can assume that the names of the fields are available in scope for your formatting arguments.
 /// For tuple structs/variants, refer to fields by their index in curly brackets (`{0}`) or prepend  the index by `f` (`f0`).
+///
+/// ## Notes
+/// Another feature of the main error is that it displays notes, to give additional context after the user read
+/// the entire error.
+///
+/// To add them, use `#[diag(note = ...)]`:
+/// ```ignore
+/// use ast_toolkit2::diag::{Diag, Diagnostic};
+///
+/// #[derive(Diagnostic)]
+/// #[diag(error, msg = "Main problem", note = "More information")]
+/// struct Error;
+///
+/// assert_eq!(Error.into_diag().notes, vec!["More information".into()]);
+/// ```
+/// Like `msg`, `notes` support formatting. In addition, you can give the attribute multiple times for multiple notes.
 ///
 /// ## `Loc`ations
 /// Diagnostics are mostly used to contextualize the error in the original source text.

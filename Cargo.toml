@@ -62,7 +62,7 @@ diagnostic = ["diag"]
 parse = ["nibble"]
 
 # Functionality
-diag = ["loc", "ast-toolkit2-proc-macros/diag", "dep:unicode-segmentation"]
+diag = ["loc", "ast-toolkit2-proc-macros/diag", "dep:console", "dep:unicode-segmentation"]
 # init = []
 loc = ["ast-toolkit2-proc-macros/loc"]
 nibble = ["dep:regex", "ast-toolkit2-proc-macros/nibble", "loc"]

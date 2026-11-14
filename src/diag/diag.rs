@@ -20,17 +20,19 @@ use super::themes::Theme;
 ///
 /// If you enabled `proc-macros`, then likely, you never have interact with this type yourself. Use
 /// the [`Diagnostic`](super::Diagnostic) derive macro instead.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Diag<E> {
     /// The style to apply while rendering.
     pub theme: Theme,
 
     /// The main severity of the Diagnostic.
-    pub sev:  Severity,
+    pub sev:   Severity,
     /// Any code to display with the main message.
-    pub code: Option<String>,
+    pub code:  Option<String>,
     /// The main message of this Diagnostic.
-    pub msg:  String,
+    pub msg:   String,
+    /// Any notes to stick to the end of the message.
+    pub notes: Vec<String>,
 
     /// The annotations slapped onto this Diagnostic.
     pub annots: Vec<Annotation<E>>,
@@ -45,7 +47,7 @@ impl<E> Diag<E> {
     /// # Returns
     /// A new Diag that can be further customized.
     #[inline]
-    pub const fn new(sev: Severity, msg: String) -> Self { Self { theme: Theme::PLAIN, sev, code: None, msg, annots: Vec::new() } }
+    pub const fn new(sev: Severity, msg: String) -> Self { Self { theme: Theme::PLAIN, sev, code: None, msg, notes: Vec::new(), annots: Vec::new() } }
 
     /// Constructs a new Diag that shows as an error with the given message.
     ///
@@ -54,7 +56,7 @@ impl<E> Diag<E> {
     /// # Returns
     /// A new Diag that can be further customized.
     #[inline]
-    pub const fn error(msg: String) -> Self { Self::new(Severity::Error, msg) }
+    pub fn error(msg: impl ToString) -> Self { Self::new(Severity::Error, msg.to_string()) }
 
     /// Constructs a new Diag that shows as a hint with the given message.
     ///
@@ -63,7 +65,7 @@ impl<E> Diag<E> {
     /// # Returns
     /// A new Diag that can be further customized.
     #[inline]
-    pub const fn help(msg: String) -> Self { Self::new(Severity::Help, msg) }
+    pub fn help(msg: impl ToString) -> Self { Self::new(Severity::Help, msg.to_string()) }
 
     /// Constructs a new Diag that shows as a suggestion with the given message.
     ///
@@ -73,7 +75,7 @@ impl<E> Diag<E> {
 
     /// A new Diag that can be further customized.
     #[inline]
-    pub const fn suggestion(msg: String) -> Self { Self::new(Severity::Suggestion, msg) }
+    pub fn suggestion(msg: impl ToString) -> Self { Self::new(Severity::Suggestion, msg.to_string()) }
 
     /// Constructs a new Diag that shows as a warning with the given message.
     ///
@@ -82,7 +84,7 @@ impl<E> Diag<E> {
     /// # Returns
     /// A new Diag that can be further customized.
     #[inline]
-    pub const fn warning(msg: String) -> Self { Self::new(Severity::Warning, msg) }
+    pub fn warning(msg: impl ToString) -> Self { Self::new(Severity::Warning, msg.to_string()) }
 
     /// Construct a new Diag by letting another type build it for us.
     ///
@@ -170,6 +172,39 @@ impl<E> Diag<E> {
     #[inline]
     pub fn with_annot(mut self, annot: Annotation<E>) -> Self {
         self.annots.push(annot);
+        self
+    }
+
+
+    /// Reserves space for a given number of notes in this Diag.
+    ///
+    /// This can be used to prepare adding multiple notes with [`Diag::with_note`] cheaper.
+    ///
+    /// # Arguments
+    /// - `additional`: The minimum number of _additional_ notes to prepare capacity for. This
+    ///   is on top of any existing notes. Also note that the backing allocator may decide to
+    ///   reserve for more if it likes.
+    ///
+    /// # Returns
+    /// The same Diag but with capacity for at least `notes` additional notes.
+    #[inline]
+    pub fn reserve_notes(mut self, additional: usize) -> Self {
+        self.notes.reserve(additional);
+        self
+    }
+
+    /// Adds a new note to this Diag.
+    ///
+    /// To remove it again, manually filter it from the [`Diag::notes`] vector.
+    ///
+    /// # Arguments
+    /// - `note`: The note to add to this Diag.
+    ///
+    /// # Returns
+    /// The same Diag but with the given `note` added.
+    #[inline]
+    pub fn with_note(mut self, note: impl ToString) -> Self {
+        self.notes.push(note.to_string());
         self
     }
 }

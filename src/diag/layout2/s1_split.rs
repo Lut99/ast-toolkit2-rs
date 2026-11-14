@@ -3,7 +3,7 @@
 //
 //  Description:
 //!   Defines step 1 of the [layouting algorith](super).
-//!    
+//!
 //!   This step is pretty simple; we just sort by source ID.
 //
 

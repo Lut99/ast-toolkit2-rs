@@ -19,14 +19,16 @@
 //!      the same source.
 //!   2. Using a [`Layouter`](s2_layout::Layouter), we turn all 1D
 //!      [`Range`](crate::loc::Range)s into 2D ones. How this is done precisely
-//!      depends on how we layout the original source text.
+//!      depends on how we layout the original source text. After this step,
+//!      all ranges are local to a line and relative to the start of it. Only
+//!      ranges without a source text are exempted, and instead have no range.
 //!   3. We internally sort each source group into _snippets_: annotations that
 //!      will be shown together in the same window. This will depend on
-//!      physical distance to each other.
-//!   4. Turn coordinates in each snippet from source coordinates to line
-//!      coordinate space. I.e., all of them become relative to the start of
-//!      the line they are on. This is also where we inject "suggestion" text
-//!      by moving all annotations that are physically coming after it.
+//!      physical distance to each other. Furthermore, rangeless annotations
+//!      ánd replacements will get their own snippets, too.
+//!   4. Inject suggestions into the snippets. This is done virtually, by
+//!      building a continuous overview of when to pull source text from the OG
+//!      source and when to use replacement text.
 //!   5. Now, render all marks and annotations in special "annotation" lines.
 //!      This is where placement happens; decide an optimal layout for all this
 //!      information.
@@ -49,36 +51,34 @@ mod s6_render;
 use std::fmt::{self, Formatter, Result as FResult};
 
 use s1_split::s1_split;
+use s2_layout::s2_layout;
 pub use s2_layout::{Layouter, LineRange, Range2D};
+use s3_snippet::s3_snippet;
+use s4_suggestion::s4_suggestion;
 
 use super::Diag;
-use crate::diag::layout2::s2_layout::s2_layout;
-use crate::diag::layout2::s3_snippet::s3_snippet;
 
 
 /***** LIBRARY *****/
 /// Helper struct that can be used to [`Display`](fmt::Display) a [`Diag`]nostic.
-pub struct Display<'l, 'd, L, E> {
-    layouter: &'l L,
+pub struct Display<'d, L, E> {
+    layouter: L,
     diag:     &'d Diag<E>,
 }
 
-impl<'l, 'd, L: Layouter<E>, E> fmt::Display for Display<'l, 'd, L, E> {
+impl<'d, L: Layouter<E>, E> fmt::Display for Display<'d, L, E> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FResult {
         // STEP 1: Split
         let mut annots = s1_split(&self.diag.annots);
 
-        // STEP 1.5: Handle `None` source
-        if let Some(annots) = annots.remove(&None) {
-            todo!()
-        }
-        let annots = annots.into_iter().map(|(k, v)| (k.unwrap(), v)).collect();
-
         // STEP 2: Layout
-        let annots = s2_layout(self.layouter, annots);
+        let annots = s2_layout(&self.layouter, annots);
 
         // STEP 3: Snippets
-        let snippets = s3_snippet(annots);
+        let snippets = s3_snippet(self.diag.sev, self.diag.msg.as_str(), self.diag.code.as_ref().map(String::as_str), annots);
+
+        // STEP 4: Suggestion
+        let snippets = s4_suggestion(snippets);
 
         /* Done */
         Ok(())
@@ -101,5 +101,5 @@ impl<E> Diag<E> {
     /// # Returns
     /// A [`Display`] implementing [`Display`](fmt::Display).
     #[inline]
-    pub const fn display<'l, L: Layouter<E>>(&self, layouter: &'l L) -> Display<'l, '_, L, E> { Display { layouter, diag: self } }
+    pub const fn display<L: Layouter<E>>(&self, layouter: L) -> Display<'_, L, E> { Display { layouter, diag: self } }
 }

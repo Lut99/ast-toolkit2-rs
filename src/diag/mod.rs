@@ -12,7 +12,8 @@
 mod annots;
 mod diag;
 // pub mod layout;
-pub mod layout2;
+// pub mod layout2;
+pub mod layout3;
 mod themes;
 
 // Use 'em
@@ -45,4 +46,36 @@ pub trait Diagnostic<E> {
     /// A fresh [`Diag`] that represents the diagnostic information of this type condensed down to
     /// something we can render.
     fn into_diag(self) -> Diag<E>;
+}
+
+
+
+
+
+/***** TESTS *****/
+#[cfg(test)]
+mod tests {
+    #[cfg(feature = "sources")]
+    use layout3::layouter::HexLayouter;
+
+    use super::*;
+    #[cfg(feature = "sources")]
+    use crate::{loc::Loc, sources::Sources};
+
+    #[cfg(feature = "sources")]
+    #[test]
+    fn test_diag_display() {
+        let mut sources = Sources::new();
+        let id = sources.add_bytes("example", b"Hello, world!");
+
+        let diag = Diag::<u8>::error("Oh no, something went wrong!")
+            .with_annot(Annotation::suggestion(Loc::encapsulate_range(id, ..5)).with_replace(b"Goodbye"));
+        assert_eq!(
+            diag.display(HexLayouter::new(100, &sources)).to_string(),
+            r#"suggestion: Consider this instead
+ --> example at 0
+  |
+"#
+        );
+    }
 }

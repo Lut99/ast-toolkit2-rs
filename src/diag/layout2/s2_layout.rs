@@ -17,7 +17,7 @@ pub(super) struct LineAnnot<'d, E> {
     pub repl:  Option<&'d [E]>,
     pub msg:   Option<&'d str>,
     pub sev:   Severity,
-    pub range: (u64, u64),
+    pub range: Option<(u64, u64)>,
 }
 
 
@@ -84,10 +84,21 @@ pub trait Layouter<E> {
 /// A collection of all `annots` sorted by source IDs and line number. Each resulting [`LineAnnot`]
 /// is equivalent to the input [`Annot`]s, excepting that its range is now scoped to a single line.
 /// There may also be more if any original annot spanned multiple lines.
-pub fn s2_layout<'d, E>(layouter: &impl Layouter<E>, annots: HashMap<u64, Vec<Annot<'d, E>>>) -> HashMap<u64, HashMap<u64, Vec<LineAnnot<'d, E>>>> {
+pub fn s2_layout<'d, E>(
+    layouter: &impl Layouter<E>,
+    annots: HashMap<Option<u64>, Vec<Annot<'d, E>>>,
+) -> HashMap<Option<u64>, HashMap<u64, Vec<LineAnnot<'d, E>>>> {
     // Let the layouter do its job
-    let mut res = HashMap::<u64, HashMap<u64, Vec<LineAnnot<'d, E>>>>::with_capacity(annots.len());
+    let mut res = HashMap::<Option<u64>, HashMap<u64, Vec<LineAnnot<'d, E>>>>::with_capacity(annots.len());
     for (source_id, annots) in annots {
+        let Some(source_id) = source_id else {
+            // These cannot be mapped to a source text - instead, leave their annotations empty
+            res.entry(None)
+                .or_default()
+                .insert(0, annots.into_iter().map(|a| LineAnnot { repl: a.repl, msg: a.msg, sev: a.sev, range: None }).collect());
+            continue;
+        };
+
         // Compute the range maps
         let ranges = layouter.layout(source_id, annots.iter().map(|a| a.range).collect());
         #[cfg(debug_assertions)]
@@ -107,17 +118,22 @@ pub fn s2_layout<'d, E>(layouter: &impl Layouter<E>, annots: HashMap<u64, Vec<An
                 repl:  annot.repl,
                 msg:   annot.msg,
                 sev:   annot.sev,
-                range: (first.pos, first.len),
+                range: Some((first.pos, first.len)),
             });
 
             // Any others will not do anything complex
             while let Some(range) = iter.next() {
-                line.entry(range.line).or_default().push(LineAnnot { repl: None, msg: None, sev: annot.sev, range: (range.pos, range.len) });
+                line.entry(range.line).or_default().push(LineAnnot {
+                    repl:  None,
+                    msg:   None,
+                    sev:   annot.sev,
+                    range: Some((range.pos, range.len)),
+                });
             }
         }
 
         // Done, save this line...
-        res.insert(source_id, line);
+        res.insert(Some(source_id), line);
     }
     // ...and save the result
     res

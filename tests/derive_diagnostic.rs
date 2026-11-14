@@ -88,6 +88,10 @@ fn test_derive_diagnostic_structs() {
         fn fmt(&self, f: &mut Formatter) -> FResult { write!(f, "This error was display'ed!") }
     }
 
+    #[derive(Diagnostic)]
+    #[diag(error, msg = "Main problem", note = "Check this out", note = "And this")]
+    struct Note;
+
 
     const ID: u64 = 0;
     assert_eq!(SimpleSyntaxSugar { loc: Loc::encapsulate(ID) }.into_diag(), Diag::<u8> {
@@ -95,6 +99,7 @@ fn test_derive_diagnostic_structs() {
         sev:    Severity::Error,
         code:   None,
         msg:    "SimpleSyntaxSugar is not doing so well...".into(),
+        notes:  Vec::new(),
         annots: vec![Annotation { repl: None, msg: None, sev: Severity::Error, loc: Loc::encapsulate(ID) }],
     });
     assert_eq!(SimpleVerbose { loc: Loc::encapsulate(ID) }.into_diag(), Diag::<u8> {
@@ -102,6 +107,7 @@ fn test_derive_diagnostic_structs() {
         sev:    Severity::Error,
         code:   None,
         msg:    "SimpleVerbose is not doing so well...".into(),
+        notes:  Vec::new(),
         annots: vec![Annotation { repl: None, msg: None, sev: Severity::Error, loc: Loc::encapsulate(ID) }],
     });
     assert_eq!(ExtraAnnot { loc: Loc::encapsulate_range(ID, ..3), reason: Loc::encapsulate_range(ID, 3..) }.into_diag(), Diag::<u8> {
@@ -109,6 +115,7 @@ fn test_derive_diagnostic_structs() {
         sev:    Severity::Help,
         code:   None,
         msg:    "ExtraAnnot is not doing so well...".into(),
+        notes:  Vec::new(),
         annots: vec![Annotation { repl: None, msg: None, sev: Severity::Help, loc: Loc::encapsulate_range(ID, ..3) }, Annotation {
             repl: None,
             msg:  Some("...and here's why!".into()),
@@ -121,6 +128,7 @@ fn test_derive_diagnostic_structs() {
         sev:    Severity::Warning,
         code:   Some("W001".into()),
         msg:    "WithCode is not doing so well...".into(),
+        notes:  Vec::new(),
         annots: Vec::new(),
     });
     assert_eq!(
@@ -136,6 +144,7 @@ fn test_derive_diagnostic_structs() {
             sev:    Severity::Error,
             code:   None,
             msg:    "Some error occurred!".into(),
+            notes:  Vec::new(),
             annots: vec![
                 Annotation { repl: None, msg: None, sev: Severity::Error, loc: Loc::encapsulate_range(ID, ..3) },
                 Annotation {
@@ -159,6 +168,7 @@ fn test_derive_diagnostic_structs() {
         sev:    Severity::Error,
         code:   Some("E42".into()),
         msg:    "Hello, world!".into(),
+        notes:  Vec::new(),
         annots: vec![Annotation {
             repl: Some("foo".into()),
             msg:  Some("Goodbye, \"world!\"".into()),
@@ -171,6 +181,7 @@ fn test_derive_diagnostic_structs() {
         sev:    Severity::Error,
         code:   Some("E42".into()),
         msg:    "Hello, world!".into(),
+        notes:  Vec::new(),
         annots: vec![Annotation {
             repl: Some("foo".into()),
             msg:  Some("Goodbye, \"world!\"".into()),
@@ -183,6 +194,7 @@ fn test_derive_diagnostic_structs() {
         sev:    Severity::Error,
         code:   None,
         msg:    "Foo".into(),
+        notes:  Vec::new(),
         annots: vec![Annotation { repl: None, msg: None, sev: Severity::Error, loc: Loc::encapsulate(ID) }],
     });
     assert_eq!(DisplayError.into_diag(), Diag::<u8> {
@@ -190,6 +202,15 @@ fn test_derive_diagnostic_structs() {
         sev:    Severity::Error,
         code:   None,
         msg:    "This error was display'ed!".into(),
+        notes:  Vec::new(),
+        annots: Vec::new(),
+    });
+    assert_eq!(Note.into_diag(), Diag::<u8> {
+        theme:  Theme::PLAIN,
+        sev:    Severity::Error,
+        code:   None,
+        msg:    "Main problem".into(),
+        notes:  vec!["Check this out".into(), "And this".into()],
         annots: Vec::new(),
     });
 }
@@ -240,6 +261,9 @@ fn test_derive_diagnostic_enums() {
 
         #[diag(error)]
         DisplayError,
+
+        #[diag(error, note = "Check this out", note = "And this")]
+        Note,
     }
     impl Display for Test {
         #[inline]
@@ -258,6 +282,7 @@ fn test_derive_diagnostic_enums() {
         sev:    Severity::Error,
         code:   None,
         msg:    "SimpleSyntaxSugar is not doing so well...".into(),
+        notes:  Vec::new(),
         annots: vec![Annotation { repl: None, msg: None, sev: Severity::Error, loc: Loc::encapsulate(ID) }],
     });
     assert_eq!(Test::SimpleVerbose { loc: Loc::encapsulate(ID) }.into_diag(), Diag::<u8> {
@@ -265,6 +290,7 @@ fn test_derive_diagnostic_enums() {
         sev:    Severity::Error,
         code:   None,
         msg:    "SimpleVerbose is not doing so well...".into(),
+        notes:  Vec::new(),
         annots: vec![Annotation { repl: None, msg: None, sev: Severity::Error, loc: Loc::encapsulate(ID) }],
     });
     assert_eq!(Test::ExtraAnnot { loc: Loc::encapsulate_range(ID, ..3), reason: Loc::encapsulate_range(ID, 3..) }.into_diag(), Diag::<u8> {
@@ -272,6 +298,7 @@ fn test_derive_diagnostic_enums() {
         sev:    Severity::Help,
         code:   None,
         msg:    "ExtraAnnot is not doing so well...".into(),
+        notes:  Vec::new(),
         annots: vec![Annotation { repl: None, msg: None, sev: Severity::Help, loc: Loc::encapsulate_range(ID, ..3) }, Annotation {
             repl: None,
             msg:  Some("...and here's why!".into()),
@@ -284,6 +311,7 @@ fn test_derive_diagnostic_enums() {
         sev:    Severity::Warning,
         code:   Some("W001".into()),
         msg:    "WithCode is not doing so well...".into(),
+        notes:  Vec::new(),
         annots: Vec::new(),
     });
     assert_eq!(
@@ -299,6 +327,7 @@ fn test_derive_diagnostic_enums() {
             sev:    Severity::Error,
             code:   None,
             msg:    "Some error occurred!".into(),
+            notes:  Vec::new(),
             annots: vec![
                 Annotation { repl: None, msg: None, sev: Severity::Error, loc: Loc::encapsulate_range(ID, ..3) },
                 Annotation {
@@ -322,6 +351,7 @@ fn test_derive_diagnostic_enums() {
         sev:    Severity::Error,
         code:   Some("E42".into()),
         msg:    "Hello, world!".into(),
+        notes:  Vec::new(),
         annots: vec![Annotation {
             repl: Some("foo".into()),
             msg:  Some("Goodbye, \"world!\"".into()),
@@ -334,6 +364,7 @@ fn test_derive_diagnostic_enums() {
         sev:    Severity::Error,
         code:   Some("E42".into()),
         msg:    "Hello, world!".into(),
+        notes:  Vec::new(),
         annots: vec![Annotation {
             repl: Some("foo".into()),
             msg:  Some("Goodbye, \"world!\"".into()),
@@ -346,6 +377,7 @@ fn test_derive_diagnostic_enums() {
         sev:    Severity::Error,
         code:   None,
         msg:    "Foo".into(),
+        notes:  Vec::new(),
         annots: vec![Annotation { repl: None, msg: None, sev: Severity::Error, loc: Loc::encapsulate(ID) }],
     });
     assert_eq!(Test::DisplayError.into_diag(), Diag::<u8> {
@@ -353,6 +385,15 @@ fn test_derive_diagnostic_enums() {
         sev:    Severity::Error,
         code:   None,
         msg:    "This error was display'ed!".into(),
+        notes:  Vec::new(),
+        annots: Vec::new(),
+    });
+    assert_eq!(Test::Note.into_diag(), Diag::<u8> {
+        theme:  Theme::PLAIN,
+        sev:    Severity::Error,
+        code:   None,
+        msg:    "".into(),
+        notes:  vec!["Check this out".into(), "And this".into()],
         annots: Vec::new(),
     });
 }

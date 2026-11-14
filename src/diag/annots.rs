@@ -32,6 +32,19 @@ pub enum Severity {
     Warning,
 }
 
+// Severity
+impl Severity {
+    /// Returns a static string name for this.
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Error => "error",
+            Self::Help => "help",
+            Self::Suggestion => "suggestion",
+            Self::Warning => "warning",
+        }
+    }
+}
+
 
 
 
@@ -76,7 +89,7 @@ impl<E> Annotation<E> {
     /// # Returns
     /// A new Annotation ready to annotate.
     #[inline]
-    pub const fn error(loc: Loc) -> Self { Self::new(Severity::Error, loc) }
+    pub fn error(loc: impl Located) -> Self { Self::new(Severity::Error, loc.loc()) }
 
     /// Creates a new annotation describing a hint.
     ///
@@ -91,7 +104,7 @@ impl<E> Annotation<E> {
     /// # Returns
     /// A new Annotation ready to annotate.
     #[inline]
-    pub const fn help(loc: Loc) -> Self { Self::new(Severity::Help, loc) }
+    pub fn help(loc: impl Located) -> Self { Self::new(Severity::Help, loc.loc()) }
 
     /// Creates a new annotation describing a suggestion.
     ///
@@ -106,7 +119,7 @@ impl<E> Annotation<E> {
     /// # Returns
     /// A new Annotation ready to annotate.
     #[inline]
-    pub const fn suggestion(loc: Loc) -> Self { Self::new(Severity::Suggestion, loc) }
+    pub fn suggestion(loc: impl Located) -> Self { Self::new(Severity::Suggestion, loc.loc()) }
 
     /// Creates a new annotation describing a warning.
     ///
@@ -120,7 +133,22 @@ impl<E> Annotation<E> {
     /// # Returns
     /// A new Annotation ready to annotate.
     #[inline]
-    pub const fn warning(loc: Loc) -> Self { Self::new(Severity::Warning, loc) }
+    pub fn warning(loc: impl Located) -> Self { Self::new(Severity::Warning, loc.loc()) }
+}
+
+// Annotation
+impl<E> Annotation<E> {
+    /// Attaches a replacement to this Annotation.
+    ///
+    /// # Arguments
+    /// - `what`: What to suggest to replace the range with.
+    ///
+    /// # Returns
+    /// Self but with an annotation.
+    pub fn with_replace(mut self, what: impl Into<Vec<E>>) -> Self {
+        self.repl = Some(what.into());
+        self
+    }
 }
 
 // Loc
