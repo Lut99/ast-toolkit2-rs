@@ -53,7 +53,7 @@ pub fn s4_render<'d, E>(f: &mut fmt::Formatter<'_>, theme: &'d Theme, layouter: 
             // <line> | <snippet>
             //        |
             //        = note: <note>
-            AnnotatedMessage::Main(m) => todo!(),
+            AnnotatedMessage::Main(m) => continue,
 
             // <severity>: <msg>
             //   --> <file>:<line>:<col>
@@ -77,7 +77,7 @@ pub fn s4_render<'d, E>(f: &mut fmt::Formatter<'_>, theme: &'d Theme, layouter: 
                     "{:>line_maxwidth$}{} {}",
                     "",
                     scaffolding_style.apply_to("-->"),
-                    loc_style.apply_to(Fmt(|f| layouter.render_loc(f, m.source_id, m.pos)))
+                    loc_style.apply_to(Fmt(|f: &mut Formatter<'_>| layouter.render_loc(f, m.source_id, m.pos)))
                 )?;
                 writeln!(f, "{:>line_maxwidth$} {}", "", scaffolding_style.apply_to("|"))?;
                 for line in &m.lines {
@@ -85,21 +85,29 @@ pub fn s4_render<'d, E>(f: &mut fmt::Formatter<'_>, theme: &'d Theme, layouter: 
                     writeln!(
                         f,
                         "{:>line_maxwidth$} {} {}",
-                        Fmt(|f| layouter.render_line_no(f, &theme.header_line_number, line.line)),
+                        Fmt(|f: &mut Formatter<'_>| layouter.render_line_no(f, &theme.header_line_number, line.line)),
                         scaffolding_style.apply_to("-"),
-                        Fmt(|f| layouter.render_line(f, theme.replace_theme(false), m.source_id, line.line, line.range))
+                        Fmt(|f: &mut Formatter<'_>| layouter.render_line(f, theme.replace_theme(false), m.source_id, line.line, line.range))
                     )?;
                 }
-                // for line in m.lines {
-                //     // Write the replacing line
-                //     writeln!(
-                //         f,
-                //         "{:>line_maxwidth$} {} {}",
-                //         Fmt(|f| layouter.render_line_no(f, &theme.header_line_number, line.line)),
-                //         scaffolding_style.apply_to("+"),
-                //         Fmt(|f| layouter.render_line_replaced(f, theme.replace_theme(true), m.source_id, line.line, line.range, m.repl))
-                //     )?;
-                // }
+                for line in m.lines {
+                    // Write the replacing line
+                    // TODO render to a buffer and then with proper line starts
+                    writeln!(
+                        f,
+                        "{:>line_maxwidth$} {} {}",
+                        Fmt(|f: &mut Formatter<'_>| layouter.render_line_no(f, &theme.header_line_number, line.line)),
+                        scaffolding_style.apply_to("+"),
+                        Fmt(|f: &mut Formatter<'_>| layouter.render_line_replaced(
+                            f,
+                            theme.replace_theme(true),
+                            m.source_id,
+                            line.line,
+                            line.range,
+                            m.repl
+                        ))
+                    )?;
+                }
                 writeln!(f, "{:>line_maxwidth$} {}", "", scaffolding_style.apply_to("|"))?;
             },
 

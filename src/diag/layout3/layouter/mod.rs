@@ -46,6 +46,19 @@ macro_rules! layouter_ptr_impl {
         }
 
         #[inline(always)]
+        fn render_line_replaced(
+            &self,
+            f: &mut Formatter<'_>,
+            theme: SourceTheme,
+            source_id: u64,
+            line: u64,
+            range: (usize, usize),
+            repl: &[E],
+        ) -> FResult {
+            <T as Layouter<E>>::render_line_replaced(self, f, theme, source_id, line, range, repl)
+        }
+
+        #[inline(always)]
         fn render_line_no(&self, f: &mut Formatter<'_>, style: &Style, line: u64) -> FResult {
             <T as Layouter<E>>::render_line_no(self, f, style, line)
         }
@@ -132,7 +145,9 @@ pub trait Layouter<E> {
 
     /// Renders a single source-line to the output.
     ///
-    /// Make sure you don't write a newline, that's up to the parent renderer.
+    /// Make sure you don't write a newline, that's up to the parent renderer. If you do, then you
+    /// incorrectly implemented [`Layouter::range_to_2d()`] (the parent renderer expected it gave
+    /// you a range that spans within a line).
     ///
     /// # Arguments
     /// - `f`: The [`Formatter`] to write to.
@@ -142,6 +157,30 @@ pub trait Layouter<E> {
     /// # Errors
     /// This function should only error if it failed to write to `f`.
     fn render_line(&self, f: &mut Formatter<'_>, theme: SourceTheme, source_id: u64, line: u64, range: (usize, usize)) -> FResult;
+
+    /// Renders a "single" source-line to the output with replaced text.
+    ///
+    /// The original line is always within a line (or else [`Layouter::range_to_2d()`] is not
+    /// implemented correctly), but the replaced version may feature a different number of lines.
+    /// As such, the parent will format to a separate buffer and later inject proper line headers.
+    /// Bottom line: feel free to render as many lines as you want!
+    ///
+    /// # Arguments
+    /// - `f`: The [`Formatter`] to write to.
+    /// - `source_id`: The ID of the source to point to.
+    /// - `pos`: The position in the file to point to.
+    ///
+    /// # Errors
+    /// This function should only error if it failed to write to `f`.
+    fn render_line_replaced(
+        &self,
+        f: &mut Formatter<'_>,
+        theme: SourceTheme,
+        source_id: u64,
+        line: u64,
+        range: (usize, usize),
+        repl: &[E],
+    ) -> FResult;
 
     /// Renders a single source-line to the output.
     ///

@@ -38,10 +38,6 @@ use s4_render::s4_render;
 
 use super::Diag;
 
-pub mod state {
-    pub use super::s4_render::{MessageRenderer, SnippetRenderer};
-}
-
 
 /***** LIBRARY *****/
 /// Helper struct that can be used to [`Display`](fmt::Display) a [`Diag`]nostic.
