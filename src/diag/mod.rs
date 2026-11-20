@@ -13,7 +13,8 @@ mod annots;
 mod diag;
 // pub mod layout;
 // pub mod layout2;
-pub mod layout3;
+// pub mod layout3;
+pub mod layout4;
 mod themes;
 
 // Use 'em
@@ -56,7 +57,7 @@ pub trait Diagnostic<E> {
 #[cfg(test)]
 mod tests {
     #[cfg(feature = "sources")]
-    use layout3::layouter::HexLayouter;
+    use layout4::renderers::HexRenderer;
 
     use super::*;
     #[cfg(feature = "sources")]
@@ -73,7 +74,7 @@ mod tests {
             .with_annot(Annotation::error(Loc::encapsulate_range(id, ..13)))
             .with_annot(Annotation::suggestion(Loc::encapsulate_range(id, ..5)).with_replace(b"Goodbye"));
         assert_eq!(
-            diag.display(HexLayouter::new(100, &sources)).to_string(),
+            diag.display(HexRenderer::new(100, &sources)).to_string(),
             r#"error[E000]: Oh no, something went wrong!
  --> example at 0
   |
