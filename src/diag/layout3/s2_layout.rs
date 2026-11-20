@@ -40,8 +40,10 @@ pub struct MessageMain2D<'d> {
 pub struct Snippet2D<'d> {
     /// The source ID of the snippet to show.
     pub source_id: u64,
+    /// The position of the error here.
+    pub pos: u64,
     /// A single snippet to show. It has one or more annotations to show within it.
-    pub lines:     Vec<SnippetLine<'d>>,
+    pub lines: Vec<SnippetLine<'d>>,
 }
 
 pub struct SnippetLine<'d> {
@@ -122,6 +124,7 @@ pub fn s2_layout<'d, L: Layouter<E>, E>(layouter: &L, msgs: Vec<Message<'d, E>>)
                             }
 
                             // Order them by-line
+                            let pos: u64 = s.annots.first().map(|a| a.range.pos).unwrap();
                             let mut lines = Vec::<SnippetLine<'d>>::new();
                             for (annot, range) in s.annots.into_iter().zip(ranges) {
                                 fn insert_at<'d>(lines: &mut Vec<SnippetLine<'d>>, l: u64, annot: Annot2D<'d>) {
@@ -148,7 +151,7 @@ pub fn s2_layout<'d, L: Layouter<E>, E>(layouter: &L, msgs: Vec<Message<'d, E>>)
                             }
 
                             // Build the snippet
-                            Snippet2D { source_id: s.source_id, lines }
+                            Snippet2D { source_id: s.source_id, pos, lines }
                         })
                         .collect(),
                 }))

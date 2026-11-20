@@ -41,8 +41,15 @@ macro_rules! layouter_ptr_impl {
         fn render_loc(&self, f: &mut Formatter<'_>, source_id: u64, pos: u64) -> FResult { <T as Layouter<E>>::render_loc(self, f, source_id, pos) }
 
         #[inline(always)]
-        fn render_line(&self, f: &mut Formatter<'_>, theme: SourceTheme, source_id: u64, line: u64, range: (usize, usize)) -> FResult {
-            <T as Layouter<E>>::render_line(self, f, theme, source_id, line, range)
+        fn render_line(
+            &self,
+            f: &mut Formatter<'_>,
+            theme: SourceTheme,
+            source_id: u64,
+            line: u64,
+            ranges: impl IntoIterator<Item = (usize, usize)>,
+        ) -> FResult {
+            <T as Layouter<E>>::render_line(self, f, theme, source_id, line, ranges)
         }
 
         #[inline(always)]
@@ -153,10 +160,19 @@ pub trait Layouter<E> {
     /// - `f`: The [`Formatter`] to write to.
     /// - `source_id`: The ID of the source to point to.
     /// - `pos`: The position in the file to point to.
+    /// - `line`: The line number we're rendering.
+    /// - `ranges`: The ranges highlighted in the line.
     ///
     /// # Errors
     /// This function should only error if it failed to write to `f`.
-    fn render_line(&self, f: &mut Formatter<'_>, theme: SourceTheme, source_id: u64, line: u64, range: (usize, usize)) -> FResult;
+    fn render_line(
+        &self,
+        f: &mut Formatter<'_>,
+        theme: SourceTheme,
+        source_id: u64,
+        line: u64,
+        ranges: impl IntoIterator<Item = (usize, usize)>,
+    ) -> FResult;
 
     /// Renders a "single" source-line to the output with replaced text.
     ///

@@ -47,8 +47,10 @@ pub struct AnnotatedMessageMain<'d> {
 pub struct AnnotatedSnippet<'d> {
     /// The source ID of the snippet to show.
     pub source_id: u64,
+    /// The position of the error here.
+    pub pos: u64,
     /// A single snippet to show. It has one or more annotations to show within it.
-    pub lines:     Vec<AnnotatedSnippetLine<'d>>,
+    pub lines: Vec<AnnotatedSnippetLine<'d>>,
 }
 
 pub struct AnnotatedSnippetLine<'d> {
@@ -306,7 +308,7 @@ pub fn s3_place<'d, E>(theme: &'d Theme, layouter: &impl Layouter<E>, msgs: Vec<
                         // With all that placed, build the new line
                         lines.push(AnnotatedSnippetLine { line: line.line, annots: line.annots, rendered });
                     }
-                    snippets.push(AnnotatedSnippet { source_id: s.source_id, lines });
+                    snippets.push(AnnotatedSnippet { source_id: s.source_id, pos: s.pos, lines });
                 }
                 res.push(AnnotatedMessage::Main(AnnotatedMessageMain { sev: m.sev, code: m.code, notes, msg: m.msg, snippets }))
             },

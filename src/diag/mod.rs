@@ -64,18 +64,27 @@ mod tests {
 
     #[cfg(feature = "sources")]
     #[test]
-    fn test_diag_display() {
+    fn test_diag_display_hex() {
         let mut sources = Sources::new();
         let id = sources.add_bytes("example", b"Hello, world!");
 
         let diag = Diag::<u8>::error("Oh no, something went wrong!")
+            .with_code("E000")
+            .with_annot(Annotation::error(Loc::encapsulate_range(id, ..13)))
             .with_annot(Annotation::suggestion(Loc::encapsulate_range(id, ..5)).with_replace(b"Goodbye"));
         assert_eq!(
             diag.display(HexLayouter::new(100, &sources)).to_string(),
-            r#"suggestion: Consider this instead
+            r#"error[E000]: Oh no, something went wrong!
+ --> example at 0
+  |
+0 | 48 65 6c 6c  6f 2c 20 77  6f 72 6c 64  21             Hello, world!   
+  | -----------------------------------------             -------------
+  |
+suggestion: Consider this instead
  --> example at 0
   |
 0 - 48 65 6c 6c  6f 2c 20 77  6f 72 6c 64  21             Hello, world!   
+0 + 47 6f 6f 64  62 79 65 2c  20 77 6f 72  6c 64 21       Goodbye, world!
   |
 "#
         );

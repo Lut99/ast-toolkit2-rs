@@ -17,6 +17,56 @@ use crate::loc::Range;
 use crate::sources::Sources;
 
 
+/***** HELPERS *****/
+/// A wrapper around three slices pretending they are one.
+#[derive(Clone, Copy)]
+struct VirtualSlice<'a>(&'a [u8], &'a [u8], &'a [u8], usize);
+impl<'a> VirtualSlice<'a> {
+    #[inline]
+    fn remain(self) -> std::range::legacy::Range<usize> { 0..self.3 }
+
+    #[inline]
+    const fn len(&self) -> usize { self.0.len() + self.1.len() + self.2.len() + self.3 }
+}
+impl<'a> Index<usize> for VirtualSlice<'a> {
+    type Output = u8;
+
+    #[inline]
+    fn index(&self, index: usize) -> &Self::Output {
+        if index < self.0.len() {
+            &self.0[index]
+        } else if index < self.1.len() {
+            &self.1[index]
+        } else if index < self.2.len() {
+            &self.2[index]
+        } else {
+            panic!("Index {} out-of-bounds for virtualslice with length {}", index, self.len())
+        }
+    }
+}
+impl<'a> IntoIterator for VirtualSlice<'a> {
+    type IntoIter = std::iter::Chain<
+        std::iter::Chain<
+            std::iter::Zip<std::iter::Repeat<bool>, std::iter::Copied<std::slice::Iter<'a, u8>>>,
+            std::iter::Zip<std::iter::Repeat<bool>, std::iter::Copied<std::slice::Iter<'a, u8>>>,
+        >,
+        std::iter::Zip<std::iter::Repeat<bool>, std::iter::Copied<std::slice::Iter<'a, u8>>>,
+    >;
+    type Item = (bool, u8);
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        std::iter::repeat(false)
+            .zip(self.0.into_iter().copied())
+            .chain(std::iter::repeat(true).zip(self.1.into_iter().copied()))
+            .chain(std::iter::repeat(false).zip(self.2.into_iter().copied()))
+    }
+}
+
+
+
+
+
 /***** LIBRARY *****/
 /// A battery-included layouter for binary data, showing it in a hexgrid.
 pub struct HexLayouter<'s, 'r, R = RandomState> {
@@ -39,11 +89,6 @@ impl<'s, 'r, R> HexLayouter<'s, 'r, R> {
 }
 
 // Layouter
-impl<'s, 'r, R> HexLayouter<'s, 'r, R> {
-    /// Computes the size of a line number.
-    #[inline(always)]
-    const fn line_number_width(line: u64) -> usize { if line > 0 { 1 + line.ilog2() as usize / 4 } else { 1 } }
-}
 impl<'s, 'r, R: BuildHasher> Layouter<u8> for HexLayouter<'s, 'r, R> {
     #[inline(always)]
     fn line_no_width(&self, line: u64) -> usize { if line > 0 { 1 + line.ilog2() as usize / 4 } else { 1 } }
@@ -99,8 +144,16 @@ impl<'s, 'r, R: BuildHasher> Layouter<u8> for HexLayouter<'s, 'r, R> {
 
     #[inline]
     #[track_caller]
-    fn render_line(&self, f: &mut Formatter<'_>, theme: SourceTheme, source_id: u64, line: u64, range: (usize, usize)) -> FResult {
+    fn render_line(
+        &self,
+        f: &mut Formatter<'_>,
+        theme: SourceTheme,
+        source_id: u64,
+        line: u64,
+        ranges: impl IntoIterator<Item = (usize, usize)>,
+    ) -> FResult {
         // Example row - 00 01 02 03  04 05 06 07  08 09 0A 0B  0C 0D 0E 0F    ..Hello,world!.-
+        let ranges = ranges.into_iter().collect::<Vec<(usize, usize)>>();
 
         // Find the line
         let line_start = 16 * line;
@@ -122,7 +175,13 @@ impl<'s, 'r, R: BuildHasher> Layouter<u8> for HexLayouter<'s, 'r, R> {
 
             // Write with the correct styling
             if let Some(b) = line.get(i) {
-                let style = if i >= range.0 && i < range.0 + range.1 { theme.highlight_style() } else { theme.base_style() };
+                let mut style = theme.base_style();
+                for range in &ranges {
+                    if i >= range.0 && i < range.0 + range.1 {
+                        style = theme.highlight_style();
+                        break;
+                    };
+                }
                 write!(f, "{:02x}", style.apply_to(b))?;
             } else {
                 write!(f, "  ")?;
@@ -134,7 +193,13 @@ impl<'s, 'r, R: BuildHasher> Layouter<u8> for HexLayouter<'s, 'r, R> {
         for i in 0..16 {
             if let Some(b) = line.get(i) {
                 let c = char::from_u32(*b as u32).unwrap_or('.');
-                let style = if i >= range.0 && i < range.0 + range.1 { theme.highlight_style() } else { theme.base_style() };
+                let mut style = theme.base_style();
+                for range in &ranges {
+                    if i >= range.0 && i < range.0 + range.1 {
+                        style = theme.highlight_style();
+                        break;
+                    };
+                }
                 write!(f, "{}", style.apply_to(c))?;
             } else {
                 write!(f, " ")?;
@@ -157,49 +222,6 @@ impl<'s, 'r, R: BuildHasher> Layouter<u8> for HexLayouter<'s, 'r, R> {
     ) -> FResult {
         // Example row - 00 01 02 03  04 05 06 07  08 09 0A 0B  0C 0D 0E 0F    ..Hello,world!.-
 
-        #[derive(Clone, Copy)]
-        struct VirtualSlice<'a>(&'a [u8], &'a [u8], &'a [u8], usize);
-        impl<'a> VirtualSlice<'a> {
-            #[inline]
-            const fn len(&self) -> usize { self.0.len() + self.1.len() + self.2.len() + self.3 }
-        }
-        impl<'a> Index<usize> for VirtualSlice<'a> {
-            type Output = u8;
-
-            #[inline]
-            fn index(&self, index: usize) -> &Self::Output {
-                if index < self.0.len() {
-                    &self.0[index]
-                } else if index < self.1.len() {
-                    &self.1[index]
-                } else if index < self.2.len() {
-                    &self.2[index]
-                } else {
-                    panic!("Index {} out-of-bounds for virtualslice with length {}", index, self.len())
-                }
-            }
-        }
-        impl<'a> IntoIterator for VirtualSlice<'a> {
-            type IntoIter = std::iter::Chain<std::iter::Chain<
-                std::iter::Chain<
-                    std::iter::Zip<std::iter::Repeat<bool>, std::iter::Copied<std::slice::Iter<'a, u8>>>,
-                    std::iter::Zip<std::iter::Repeat<bool>, std::iter::Copied<std::slice::Iter<'a, u8>>>,
-                >,
-                std::iter::Zip<std::iter::Repeat<bool>, std::iter::Copied<std::slice::Iter<'a, u8>>>,
-            >, std::iter::Zip<std::iter::Take<std::iter::Repeat<bool>>, std::iter::Repeat<u8>>>;
-            type Item = (bool, u8);
-
-            #[inline]
-            fn into_iter(self) -> Self::IntoIter {
-                std::iter::repeat(false)
-                    .zip(self.0.into_iter().copied())
-                    .chain(std::iter::repeat(true).zip(self.1.into_iter().copied()))
-                    .chain(std::iter::repeat(false).zip(self.2.into_iter().copied()))
-                    .chain(std::iter::repeat(false).take(self.3), std::iter::repeat(b' '))
-            }
-        }
-
-
         // First, load the part of the line that is before the range
         let (range_pos, range_len) = range;
         let pre_line_start = 16 * line;
@@ -210,10 +232,10 @@ impl<'s, 'r, R: BuildHasher> Layouter<u8> for HexLayouter<'s, 'r, R> {
             .unwrap_or_else(|| panic!("Please call `Sources::load({source_id}, {pre_line_start}..{pre_line_end})` first before rendering"));
 
         // Now compute how much we need to load after the range to get a mod of 16 again
-        let padded_range_len = range_pos + range_len;
-        let aft_line_len = (16 - padded_range_len / 16) % 16;
+        let padded_repl_len = range_pos + repl.len();
+        let aft_line_len = (16 - padded_repl_len % 16) % 16;
         // Load that much end line
-        let aft_line_start = padded_range_len;
+        let aft_line_start = range_pos + range_len;
         let aft_line_end = aft_line_start + aft_line_len;
         let aft_line: &[u8] = self
             .sources
@@ -227,48 +249,19 @@ impl<'s, 'r, R: BuildHasher> Layouter<u8> for HexLayouter<'s, 'r, R> {
         assert!(slice.len() % 16 == 0);
 
         // Write them all as if it's one text
-        let mut buf: [u8; 16] = [0; 16];
-        write!(f, "    ")?;
-        for (i, (highlighted, b)) in slice.into_iter().enumerate() {
+        let mut i: usize = 0;
+        let mut buf: [(bool, u8); 16] = [(false, 0); 16];
+        for (highlighted, b) in slice.into_iter() {
             // Newline time!
-            if i > 0 && i % 16 == 0 {}
-
-            // Write the preceding space
-            if i > 0 {
-                if i % 4 == 0 {
-                    write!(f, " ")?;
-                }
-                write!(f, " ")?;
-            }
-
-            // Write with the correct styling
-            if let Some(b) = pre_line.get(i) {
-                write!(f, "{:02x}", if highlighted { theme.highlight_style() } else { theme.base_style() }.apply_to(b))?;
-            } else {
-                write!(f, "  ")?;
-            }
-        }
-
-        // Write the highlighted, replaced line
-        for i in 0..repl.len() {
-            let pos = range_pos + i;
-            if pos > 0 && pos % 16 == 0 {
-                // Newline time!
-
+            if i > 0 && i % 16 == 0 {
                 // Write the ascii part
                 write!(f, "    ")?;
-                for i in 0..16 {
-                        let c = char::from_u32(*b as u32).unwrap_or('.');
-                        let style = if i >= range_pos && i < range_pos + range_len { theme.highlight_style() } else { theme.base_style() };
-                        write!(f, "{}", style.apply_to(c))?;
-                    } else {
-                        write!(f, " ")?;
-                    }
+                for (highlighted, b) in buf {
+                    let c = char::from_u32(b as u32).unwrap_or('.');
+                    let style = if highlighted { theme.highlight_style() } else { theme.base_style() };
+                    write!(f, "{}", style.apply_to(c))?;
                 }
-
-                // Write the line and newline padding
                 writeln!(f)?;
-                write!(f, "    ")?;
             }
 
             // Write the preceding space
@@ -280,12 +273,29 @@ impl<'s, 'r, R: BuildHasher> Layouter<u8> for HexLayouter<'s, 'r, R> {
             }
 
             // Write with the correct styling
-            if let Some(b) = pre_line.get(i) {
-                write!(f, "{:02x}", theme.highlight_style().apply_to(b))?;
-            } else {
-                write!(f, "  ")?;
-            }
+            write!(f, "{:02x}", if highlighted { theme.highlight_style() } else { theme.base_style() }.apply_to(b))?;
+            buf[i % 16] = (highlighted, b);
+            i += 1;
         }
+
+        // Write the remaining line and a final newline
+        for j in slice.remain() {
+            if i + j > 0 {
+                if (i + j) % 4 == 0 {
+                    write!(f, " ")?;
+                }
+                write!(f, " ")?;
+            }
+            write!(f, "  ")?;
+        }
+        // Write the ascii part
+        write!(f, "    ")?;
+        for (highlighted, b) in &buf[..i % 16] {
+            let c = char::from_u32(*b as u32).unwrap_or('.');
+            let style = if *highlighted { theme.highlight_style() } else { theme.base_style() };
+            write!(f, "{}", style.apply_to(c))?;
+        }
+        writeln!(f)?;
 
         // Done
         Ok(())
