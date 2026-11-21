@@ -52,7 +52,7 @@ impl<'d> RenderedLine<'d> {
         let at_end: usize = draw_pos + draw.len();
         let mut pos: usize = 0;
         for i in 0..self.draw.len() {
-            if at_end < pos {
+            if pos > draw_pos {
                 // It'll never work, bucko
                 return false;
             }

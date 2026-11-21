@@ -343,7 +343,7 @@ impl<'s, 'r, R: BuildHasher> Renderer<u8> for HexRenderer<'s, 'r, R> {
             // First, get the relevant source as zero or more lines
             // A bit of gymnastics has to happen here to group the annotations together on the same
             // lines.
-            let loc: String = format!("{} at {:X}", name, snip.annots.first().map(|a| a.range.pos).unwrap());
+            let loc: String = format!("{} at 0x{:X}", name, snip.annots.first().map(|a| a.range.pos).unwrap());
             let ranges = self.range_to_2d(snip.source_id, snip.annots.iter().map(|a| a.range));
             let mut annots_by_line = Vec::<(u64, Vec<LineAnnot>)>::new();
             for (annot, ranges) in snip.annots.into_iter().zip(ranges) {
@@ -399,7 +399,7 @@ impl<'s, 'r, R: BuildHasher> Renderer<u8> for HexRenderer<'s, 'r, R> {
         let max_line_no = ranges.iter().map(|(l, _)| l).copied().max().unwrap_or(0);
         let max_line_no_width = if max_line_no > 0 { 1 + max_line_no.ilog2() as usize / 4 } else { 1 };
         let name: &str = self.sources.get_name_of(msg.source_id).unwrap();
-        let loc: String = format!("{} at {:X}", name, msg.range.pos);
+        let loc: String = format!("{} at 0x{:X}", name, msg.range.pos);
 
         // Then, write the message & snippet headers
         f.set_max_line_width(self.max_line_width);

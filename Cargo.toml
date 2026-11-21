@@ -8,6 +8,12 @@ license.workspace = true
 description = "A (second) collection of libraries and macros for working with ASTs and compilers in Rust."
 
 
+[[example]]
+name = "diag"
+path = "./examples/diag.rs"
+required-features = ["diag", "sources"]
+
+
 [[test]]
 name = "derive_diagnostic"
 path = "./tests/derive_diagnostic.rs"
@@ -51,6 +57,7 @@ ast-toolkit2-proc-macros = { path = "./proc-macros", optional = true }
 
 
 [dev-dependencies]
+clap = { version = "4.6.0", features = ["derive"] }
 serde_json = "1.0.0"
 
 

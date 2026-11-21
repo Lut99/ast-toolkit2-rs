@@ -96,7 +96,7 @@ pub fn write_header_main(
     write!(f, "{}{}{}", sev_style.apply_to(ssev), code_style.apply_to(&scode), msg_style.apply_to(": "))?;
 
     // Write the message linewrapped
-    write_linewrapped(f, max_line_width, ssev.len() + scode.graphemes(true).count() + 2, &theme.header_extra_msg, 0, msg)?;
+    write_linewrapped(f, max_line_width, ssev.len() + scode.graphemes(true).count() + 2, &theme.header_main_msg, 0, msg)?;
     writeln!(f)
 }
 
@@ -139,7 +139,7 @@ pub fn write_empty_source_line(f: &mut fmt::Formatter<'_>, theme: &Theme, max_li
 /// Function writing the start of a source line.
 pub fn write_source_line_start(f: &mut fmt::Formatter<'_>, theme: &Theme, max_line_no_width: usize, scaffolding_char: char, l: &str) -> fmt::Result {
     let scaffolding_style = &theme.scaffolding;
-    write!(f, "{:>max_line_no_width$} {} ", l, scaffolding_style.apply_to(scaffolding_char))
+    write!(f, "{:>max_line_no_width$} {} ", theme.header_line_number.apply_to(l), scaffolding_style.apply_to(scaffolding_char))
 }
 
 

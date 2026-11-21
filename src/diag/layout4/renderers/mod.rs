@@ -5,6 +5,8 @@
 //!   Defines the builtin renderers.
 //
 
-pub mod hex;
+mod hex;
+mod utf8;
 
 pub use hex::HexRenderer;
+pub use utf8::Utf8Renderer;

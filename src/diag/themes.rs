@@ -117,7 +117,7 @@ impl Theme {
         header_main_msg: Style::new().bold(),
         header_extra_msg: Style::new(),
         header_loc: Style::new(),
-        header_line_number: Style::new().blue().bold(),
+        header_line_number: Style::new().blue().bold().bright(),
 
         source_base: Style::new(),
         source_error: Style::new(),
@@ -132,7 +132,7 @@ impl Theme {
         marker_suggestion: ('+', Style::new().green().bold()),
         marker_warn: ('-', Style::new().yellow().bold()),
 
-        scaffolding:     Style::new().blue().bold(),
+        scaffolding:     Style::new().blue().bold().bright(),
         footer_note:     Style::new().bold(),
         footer_note_msg: Style::new(),
     };

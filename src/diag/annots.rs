@@ -138,6 +138,19 @@ impl<E> Annotation<E> {
 
 // Annotation
 impl<E> Annotation<E> {
+    /// Consumes this Annotation to create an equal one but with a given message.
+    ///
+    /// # Arguments
+    /// - `msg`: Some string describing the message to attach.
+    ///
+    /// # Returns
+    /// The same Diag but with the given `msg`.
+    #[inline]
+    pub fn with_msg(mut self, msg: impl Into<String>) -> Self {
+        self.msg = Some(msg.into());
+        self
+    }
+
     /// Attaches a replacement to this Annotation.
     ///
     /// # Arguments

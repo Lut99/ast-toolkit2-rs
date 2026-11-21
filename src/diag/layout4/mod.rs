@@ -18,14 +18,47 @@ mod messages;
 #[cfg(feature = "sources")]
 pub mod renderers;
 
+use std::cell::{Ref, RefMut};
 // Imports & Exports
 use std::fmt;
+use std::rc::Rc;
+use std::sync::{Arc, MutexGuard, RwLockReadGuard, RwLockWriteGuard};
 
 pub use formatter::{main, replace, sourceless};
 use messages::{Message, as_messages};
 
 use super::Diag;
 use super::annots::Severity;
+
+
+/***** HELPER MACROS *****/
+macro_rules! renderer_ptr_impl {
+    (__impl) => {
+        fn render_main<'d>(&self, f: main::Formatter<'d, '_>, msg: main::Message<'d>) -> fmt::Result { <T as Renderer<E>>::render_main(self, f, msg) }
+
+        fn render_replace<'d>(&self, f: replace::Formatter<'d, '_>, msg: replace::Message<'d, E>) -> fmt::Result {
+            <T as Renderer<E>>::render_replace(self, f, msg)
+        }
+
+        fn render_sourceless<'d>(&self, f: sourceless::Formatter<'d, '_>, msg: sourceless::Message<'d>) -> fmt::Result {
+            <T as Renderer<E>>::render_sourceless(self, f, msg)
+        }
+    };
+
+    ('a, $ty:ty) => {
+        impl<'a, E, T: Renderer<E>> Renderer<E> for $ty {
+            renderer_ptr_impl!(__impl);
+        }
+    };
+    ($ty:ty) => {
+        impl<E, T: Renderer<E>> Renderer<E> for $ty {
+            renderer_ptr_impl!(__impl);
+        }
+    };
+}
+
+
+
 
 
 /***** INTERFACES *****/
@@ -91,6 +124,18 @@ pub trait Renderer<E> {
     /// This function should only error if it failed to interact with `f`.
     fn render_sourceless<'d>(&self, f: sourceless::Formatter<'d, '_>, msg: sourceless::Message<'d>) -> fmt::Result;
 }
+
+// Pointer-like impls
+renderer_ptr_impl!('a, &'a T);
+renderer_ptr_impl!('a, &'a mut T);
+renderer_ptr_impl!(Box<T>);
+renderer_ptr_impl!(Rc<T>);
+renderer_ptr_impl!(Arc<T>);
+renderer_ptr_impl!('a, Ref<'a, T>);
+renderer_ptr_impl!('a, RefMut<'a, T>);
+renderer_ptr_impl!('a, MutexGuard<'a, T>);
+renderer_ptr_impl!('a, RwLockReadGuard<'a, T>);
+renderer_ptr_impl!('a, RwLockWriteGuard<'a, T>);
 
 
 
