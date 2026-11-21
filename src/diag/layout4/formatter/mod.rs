@@ -7,4 +7,5 @@
 
 // Modules
 pub(super) mod common;
+pub mod replace;
 pub mod sourceless;

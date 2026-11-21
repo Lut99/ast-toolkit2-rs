@@ -67,6 +67,34 @@ pub fn write_header(f: &mut fmt::Formatter<'_>, theme: &Theme, max_line_width: u
 
 
 
+/// Function writing the standard loc string.
+pub fn write_loc(f: &mut fmt::Formatter<'_>, theme: &Theme, max_line_no_width: usize, loc: &str) -> fmt::Result {
+    let scaffolding_style = &theme.scaffolding;
+    let loc_style = &theme.header_loc;
+
+    // Write the string
+    writeln!(f, "{:>max_line_no_width$}{} {}", "", scaffolding_style.apply_to("-->"), loc_style.apply_to(loc))
+    // writeln!(f, "{:>line_maxwidth$} {}", "", scaffolding_style.apply_to("|"))?;
+}
+
+
+
+/// Function writing that first empty line of a snippet.
+pub fn write_empty_source_line(f: &mut fmt::Formatter<'_>, theme: &Theme, max_line_no_width: usize) -> fmt::Result {
+    let scaffolding_style = &theme.scaffolding;
+    writeln!(f, "{:>max_line_no_width$} {}", "", scaffolding_style.apply_to("|"))
+}
+
+
+
+/// Function writing the start of a source line.
+pub fn write_source_line_start(f: &mut fmt::Formatter<'_>, theme: &Theme, max_line_no_width: usize, scaffolding_char: char, l: &str) -> fmt::Result {
+    let scaffolding_style = &theme.scaffolding;
+    write!(f, "{:>max_line_no_width$} {} ", l, scaffolding_style.apply_to(scaffolding_char))
+}
+
+
+
 
 
 /***** TESTS *****/

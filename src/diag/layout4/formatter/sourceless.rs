@@ -7,6 +7,7 @@
 
 use std::fmt;
 
+use super::super::super::annots::Severity;
 use super::super::super::themes::Theme;
 pub use super::super::messages::MessageSourceless as Message;
 use super::common::write_header;
@@ -48,17 +49,19 @@ impl<'a, 'f> Formatter<'a, 'f> {
 
 // Formatting
 impl<'a, 'f> Formatter<'a, 'f> {
-    /// Renders the given [`MessageSourceless`] to the internal formatter.
+    /// Writes the entire message to the internal formatter.
+    ///
+    /// This is done in one step because there is no need to render source (by definition).
     ///
     /// # Arguments
-    /// - `msg`: The [`MessageSourceless`] to render (i.e., one without source, i.e., requiring no
-    ///   input from you!).
+    /// - `sev`: A [`Severity`] detailling the severity of the error.
+    /// - `msg`: A string message describing what happened.
     ///
     /// # Errors
     /// This function fails if we failed to write to the internal writer.
     #[inline(always)]
-    pub fn write_sourceless(&mut self, msg: Message<'_>) -> fmt::Result {
-        write_header(self.f, self.theme, self.max_line_width, false, msg.sev, msg.msg)
+    pub fn write_message(&mut self, sev: Severity, msg: &str) -> fmt::Result {
+        write_header(self.f, self.theme, self.max_line_width, false, sev, msg)
     }
 }
 
@@ -81,7 +84,8 @@ mod tests {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             let mut f = Formatter::new(&Theme::PLAIN, f);
             f.set_max_line_width(20);
-            f.write_sourceless(self.0.take().take().unwrap())
+            let msg = self.0.take().take().unwrap();
+            f.write_message(msg.sev, msg.msg)
         }
     }
 

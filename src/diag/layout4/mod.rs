@@ -21,13 +21,57 @@ pub mod renderers;
 // Imports & Exports
 use std::fmt;
 
-pub use formatter::sourceless;
+pub use formatter::{replace, sourceless};
 use messages::{Message, as_messages};
 
 use super::Diag;
 
 
+/***** HELPER MACROS *****/
+macro_rules! styled_write_ptr_impl {
+    (__impl) => {
+        #[inline(always)]
+        fn write_highlighted(&mut self, target: impl fmt::Display) -> fmt::Result { <T as StyledWrite>::write_highlighted(self, target) }
+
+        #[inline(always)]
+        fn write_base(&mut self, target: impl fmt::Display) -> fmt::Result { <T as StyledWrite>::write_base(self, target) }
+    };
+
+    ('a, $ty:ty) => {
+        impl<'a, T: StyledWrite> StyledWrite for $ty {
+            styled_write_ptr_impl!(__impl);
+        }
+    };
+
+    ($ty:ty) => {
+        impl<T: StyledWrite> StyledWrite for $ty {
+            styled_write_ptr_impl!(__impl);
+        }
+    };
+}
+
+
+
+
+
 /***** INTERFACES *****/
+/// Helper interface giving styling options to a [`fmt::Write`]r.
+pub trait StyledWrite: fmt::Write {
+    /// Applies the internal style for highlighted source text to your given
+    /// [`Display`](fmt::Display).
+    fn write_highlighted(&mut self, target: impl fmt::Display) -> fmt::Result;
+
+    /// Applies the internal style for unhighlighted source text to your given
+    /// [`Display`](fmt::Display).
+    fn write_base(&mut self, target: impl fmt::Display) -> fmt::Result;
+}
+
+// Pointer-like impls
+styled_write_ptr_impl!('a, &'a mut T);
+
+
+
+/// Interface that you can implement for a struct rendering source text.
 pub trait Renderer<E> {
     /// Renders a [`MessageMain`] to the given `f`ormatter.
     ///
@@ -49,7 +93,7 @@ pub trait Renderer<E> {
     ///
     /// # Errors
     /// This function should only error if it failed to interact with `f`.
-    fn render_replace(&self, f: (), msg: ()) -> fmt::Result;
+    fn render_replace(&self, f: replace::Formatter<'_, '_>, msg: replace::Message<'_, E>) -> fmt::Result;
 
     /// Renders a [`sourceless::Message`] to the given `f`ormatter.
     ///
@@ -83,7 +127,7 @@ impl<'d, R: Renderer<E>, E> fmt::Display for Display<'d, R, E> {
         for msg in msgs {
             match msg {
                 Message::Main(m) => self.renderer.render_main((), ())?,
-                Message::Replace(m) => self.renderer.render_replace((), ())?,
+                Message::Replace(m) => self.renderer.render_replace(replace::Formatter::new(&self.diag.theme, f), m)?,
                 Message::Sourceless(m) => self.renderer.render_sourceless(sourceless::Formatter::new(&self.diag.theme, f), m)?,
             }
         }

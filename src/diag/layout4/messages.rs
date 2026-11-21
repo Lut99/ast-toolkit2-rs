@@ -61,15 +61,15 @@ pub(super) struct Annot<'d> {
 /// A "replace" message contains a single annotation showing a suggested replacement.
 pub struct MessageReplace<'d, E> {
     /// The source ID of the (only) snippet to show.
-    pub(super) source_id: u64,
+    pub source_id: u64,
     /// The severity of the message/(only) annotation.
-    pub(super) sev: Severity,
+    pub sev: Severity,
     /// The message of the message/(only) annotation.
-    pub(super) msg: &'d str,
+    pub msg: &'d str,
     /// The replacement to make.
-    pub(super) repl: &'d [E],
+    pub repl: &'d [E],
     /// The range of the (only) annotation.
-    pub(super) range: Range,
+    pub range: Range,
 }
 
 
@@ -77,9 +77,9 @@ pub struct MessageReplace<'d, E> {
 /// A "sourceless" message has no annotations whatsoever and, therefore, no source text.
 pub struct MessageSourceless<'d> {
     /// The severity of the message.
-    pub(super) sev: Severity,
+    pub sev: Severity,
     /// The message of the message.
-    pub(super) msg: &'d str,
+    pub msg: &'d str,
 }
 
 
