@@ -340,6 +340,10 @@ impl<'s, 'r, R: BuildHasher> Renderer<u8> for HexRenderer<'s, 'r, R> {
                 continue;
             }
 
+            // TODO: Change the below to include missing lines unless the distance is too great;
+            // insert a break symbol thingy then.
+            todo!();
+
             // First, get the relevant source as zero or more lines
             // A bit of gymnastics has to happen here to group the annotations together on the same
             // lines.
