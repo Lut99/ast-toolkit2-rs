@@ -21,37 +21,11 @@ pub mod renderers;
 // Imports & Exports
 use std::fmt;
 
-pub use formatter::{replace, sourceless};
+pub use formatter::{main, replace, sourceless};
 use messages::{Message, as_messages};
 
 use super::Diag;
-
-
-/***** HELPER MACROS *****/
-macro_rules! styled_write_ptr_impl {
-    (__impl) => {
-        #[inline(always)]
-        fn write_highlighted(&mut self, target: impl fmt::Display) -> fmt::Result { <T as StyledWrite>::write_highlighted(self, target) }
-
-        #[inline(always)]
-        fn write_base(&mut self, target: impl fmt::Display) -> fmt::Result { <T as StyledWrite>::write_base(self, target) }
-    };
-
-    ('a, $ty:ty) => {
-        impl<'a, T: StyledWrite> StyledWrite for $ty {
-            styled_write_ptr_impl!(__impl);
-        }
-    };
-
-    ($ty:ty) => {
-        impl<T: StyledWrite> StyledWrite for $ty {
-            styled_write_ptr_impl!(__impl);
-        }
-    };
-}
-
-
-
+use super::annots::Severity;
 
 
 /***** INTERFACES *****/
@@ -59,7 +33,7 @@ macro_rules! styled_write_ptr_impl {
 pub trait StyledWrite: fmt::Write {
     /// Applies the internal style for highlighted source text to your given
     /// [`Display`](fmt::Display).
-    fn write_highlighted(&mut self, target: impl fmt::Display) -> fmt::Result;
+    fn write_highlighted(&mut self, sev: Severity, target: impl fmt::Display) -> fmt::Result;
 
     /// Applies the internal style for unhighlighted source text to your given
     /// [`Display`](fmt::Display).
@@ -67,7 +41,15 @@ pub trait StyledWrite: fmt::Write {
 }
 
 // Pointer-like impls
-styled_write_ptr_impl!('a, &'a mut T);
+impl<'a, T: StyledWrite> StyledWrite for &'a mut T {
+    #[inline(always)]
+    fn write_highlighted(&mut self, sev: Severity, target: impl fmt::Display) -> fmt::Result {
+        <T as StyledWrite>::write_highlighted(self, sev, target)
+    }
+
+    #[inline(always)]
+    fn write_base(&mut self, target: impl fmt::Display) -> fmt::Result { <T as StyledWrite>::write_base(self, target) }
+}
 
 
 
@@ -82,7 +64,7 @@ pub trait Renderer<E> {
     ///
     /// # Errors
     /// This function should only error if it failed to interact with `f`.
-    fn render_main(&self, f: (), msg: ()) -> fmt::Result;
+    fn render_main<'d>(&self, f: main::Formatter<'d, '_>, msg: main::Message<'d>) -> fmt::Result;
 
     /// Renders a [`MessageReplace`] to the given `f`ormatter.
     ///
@@ -93,7 +75,7 @@ pub trait Renderer<E> {
     ///
     /// # Errors
     /// This function should only error if it failed to interact with `f`.
-    fn render_replace(&self, f: replace::Formatter<'_, '_>, msg: replace::Message<'_, E>) -> fmt::Result;
+    fn render_replace<'d>(&self, f: replace::Formatter<'d, '_>, msg: replace::Message<'d, E>) -> fmt::Result;
 
     /// Renders a [`sourceless::Message`] to the given `f`ormatter.
     ///
@@ -107,7 +89,7 @@ pub trait Renderer<E> {
     ///
     /// # Errors
     /// This function should only error if it failed to interact with `f`.
-    fn render_sourceless(&self, f: sourceless::Formatter<'_, '_>, msg: sourceless::Message<'_>) -> fmt::Result;
+    fn render_sourceless<'d>(&self, f: sourceless::Formatter<'d, '_>, msg: sourceless::Message<'d>) -> fmt::Result;
 }
 
 
@@ -126,7 +108,7 @@ impl<'d, R: Renderer<E>, E> fmt::Display for Display<'d, R, E> {
         let msgs = as_messages(self.diag);
         for msg in msgs {
             match msg {
-                Message::Main(m) => self.renderer.render_main((), ())?,
+                Message::Main(m) => self.renderer.render_main(main::Formatter::new(&self.diag.theme, f), m)?,
                 Message::Replace(m) => self.renderer.render_replace(replace::Formatter::new(&self.diag.theme, f), m)?,
                 Message::Sourceless(m) => self.renderer.render_sourceless(sourceless::Formatter::new(&self.diag.theme, f), m)?,
             }

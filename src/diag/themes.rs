@@ -13,45 +13,6 @@ use console::Style;
 use crate::diag::Severity;
 
 
-/***** HELPERS *****/
-#[derive(Debug, Clone, Copy)]
-enum HighlightOrReplace {
-    Highlight(Severity),
-    Replace(bool),
-}
-
-
-
-/// A subset of a [`Theme`] that shows the correct styling for highlighting in a snippet.
-#[derive(Debug, Clone, Copy)]
-pub struct SourceTheme<'t> {
-    theme: &'t Theme,
-    how:   HighlightOrReplace,
-}
-
-impl<'t> SourceTheme<'t> {
-    /// Returns the base styling to apply.
-    #[inline]
-    pub const fn base_style(&self) -> &Style { &self.theme.source_base }
-
-    /// Returns the highlight styling to apply.
-    #[inline]
-    pub const fn highlight_style(&self) -> &Style {
-        match self.how {
-            HighlightOrReplace::Highlight(Severity::Error) => &self.theme.source_error,
-            HighlightOrReplace::Highlight(Severity::Help) => &self.theme.source_help,
-            HighlightOrReplace::Highlight(Severity::Suggestion) => &self.theme.source_suggestion,
-            HighlightOrReplace::Highlight(Severity::Warning) => &self.theme.source_warn,
-            HighlightOrReplace::Replace(false) => &self.theme.source_replace_old,
-            HighlightOrReplace::Replace(true) => &self.theme.source_replace_new,
-        }
-    }
-}
-
-
-
-
-
 /***** LIBRARY *****/
 /// Defines a theme for customizing layouting of source snippets with their annotations.
 ///
@@ -107,7 +68,11 @@ pub struct Theme {
 
     // Misc
     /// The style of punctuation used to visually make up the message.
-    pub scaffolding: Style,
+    pub scaffolding:     Style,
+    /// The style of the `note:` in the footer, if any.
+    pub footer_note:     Style,
+    /// The style of any message attached to the `note`.
+    pub footer_note_msg: Style,
 }
 
 // Provided themes
@@ -137,7 +102,9 @@ impl Theme {
         marker_suggestion: ('+', Style::new()),
         marker_warn: ('-', Style::new()),
 
-        scaffolding: Style::new(),
+        scaffolding:     Style::new(),
+        footer_note:     Style::new(),
+        footer_note_msg: Style::new(),
     };
 
     /// Simulates colors as used by the Rust compiler.
@@ -165,29 +132,14 @@ impl Theme {
         marker_suggestion: ('+', Style::new().green().bold()),
         marker_warn: ('-', Style::new().yellow().bold()),
 
-        scaffolding: Style::new().blue().bold(),
+        scaffolding:     Style::new().blue().bold(),
+        footer_note:     Style::new().bold(),
+        footer_note_msg: Style::new(),
     };
 }
 
 // Helpers
 impl Theme {
-    /// Returns a helper struct for choosing the correct source styling.
-    ///
-    /// This version assumes the snippet is shown for replacing.
-    ///
-    /// # Arguments
-    /// - `showing_new`: Whether or we are currently showing the old text (false) or the new text
-    ///   (true).
-    ///
-    /// # Returns
-    /// A [`SourceTheme`] that implements methods to get the correct styling.
-    #[inline(always)]
-    pub const fn replace_theme(&self, showing_new: bool) -> SourceTheme<'_> {
-        SourceTheme { theme: self, how: HighlightOrReplace::Replace(showing_new) }
-    }
-
-
-
     /// Returns the marker style for the given severity level.
     #[inline]
     pub const fn header_severity_style(&self, sev: Severity) -> &Style {
@@ -253,6 +205,8 @@ impl Debug for Theme {
                 marker_suggestion,
                 marker_warn,
                 scaffolding,
+                footer_note,
+                footer_note_msg,
             } = self;
             let mut fmt = f.debug_struct("Theme::CUSTOM");
             fmt.field("header_error", header_error);
@@ -276,6 +230,8 @@ impl Debug for Theme {
             fmt.field("marker_suggestion", marker_suggestion);
             fmt.field("marker_warn", marker_warn);
             fmt.field("scaffolding", scaffolding);
+            fmt.field("footer_note", footer_note);
+            fmt.field("footer_note_msg", footer_note_msg);
             fmt.finish()
         }
     }

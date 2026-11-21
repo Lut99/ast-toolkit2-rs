@@ -9,7 +9,6 @@ use std::fmt;
 
 #[cfg(feature = "decl-macros")]
 pub use ast_toolkit2_decl_macros::write_highlighted;
-use console::StyledObject;
 
 use super::super::super::themes::Theme;
 use super::super::StyledWrite;
@@ -71,7 +70,7 @@ impl<'a, 'f> Formatter<'a, 'f> {
     #[inline(always)]
     pub fn start_message(&mut self, sev: Severity, msg: &str) -> Result<MessageFormatter<'_, 'a, 'f>, fmt::Error> {
         // Write the error header first
-        write_header(self.f, self.theme, self.max_line_width, false, sev, msg)?;
+        write_header(self.f, self.theme, self.max_line_width, sev, msg)?;
 
         // Continue with the nested struct
         Ok(MessageFormatter::new(self))
@@ -155,6 +154,15 @@ impl<'s, 'a, 'f> SnippetFormatter<'s, 'a, 'f> {
         PreReplaceFormatter { max_line_no_width: self.max_line_no_width, f: self.f }
     }
 
+    /// Starts rendering aft-replace source lines.
+    ///
+    /// # Returns
+    /// A [`AftReplaceFormatter`] that can be used to write the remainder of the snippet.
+    #[inline(always)]
+    pub const fn start_aft_replace(&mut self) -> AftReplaceFormatter<'_, 'a, 'f> {
+        AftReplaceFormatter { max_line_no_width: self.max_line_no_width, f: self.f }
+    }
+
 
     /// Finishes rendering this replace snippet part.
     ///
@@ -187,7 +195,7 @@ impl<'s, 'a, 'f> PreReplaceFormatter<'s, 'a, 'f> {
     #[inline(always)]
     pub fn start_line(&mut self, l: &str) -> Result<PreReplaceLineFormatter<'_, 'a, 'f>, fmt::Error> {
         write_source_line_start(self.f.f, self.f.theme, self.max_line_no_width, '-', l)?;
-        Ok(PreReplaceLineFormatter { sev: Severity::Error, f: self.f })
+        Ok(PreReplaceLineFormatter { f: self.f })
     }
 
 
@@ -200,24 +208,7 @@ impl<'s, 'a, 'f> PreReplaceFormatter<'s, 'a, 'f> {
 
 /// Allows one to write a replacing source line.
 pub struct PreReplaceLineFormatter<'s, 'a, 'f> {
-    sev: Severity,
-    f:   &'s mut Formatter<'a, 'f>,
-}
-
-// Factory methods
-impl<'s, 'a, 'f> PreReplaceLineFormatter<'s, 'a, 'f> {
-    /// Sets the severity applied to all highlighting in this line.
-    ///
-    /// # Arguments
-    /// - `sev`: The [`Severity`] to apply.
-    ///
-    /// # Returns
-    /// Self for chaining.
-    #[inline(always)]
-    pub fn set_severity(&mut self, sev: Severity) -> &mut Self {
-        self.sev = sev;
-        self
-    }
+    f: &'s mut Formatter<'a, 'f>,
 }
 
 // Formatting
@@ -231,16 +222,84 @@ impl<'s, 'a, 'f> fmt::Write for PreReplaceLineFormatter<'s, 'a, 'f> {
         self.f.f.write_str(s)
     }
 }
-impl<'s, 'a, 'f> super::super::StyledWrite for PreReplaceLineFormatter<'s, 'a, 'f> {
+impl<'s, 'a, 'f> StyledWrite for PreReplaceLineFormatter<'s, 'a, 'f> {
     #[inline]
-    fn write_highlighted(&mut self, target: impl fmt::Display) -> fmt::Result {
-        write!(self.f.f, "{}", self.f.theme.source_highlight_style(self.sev).apply_to(target))
+    fn write_highlighted(&mut self, sev: Severity, target: impl fmt::Display) -> fmt::Result {
+        write!(self.f.f, "{}", self.f.theme.source_highlight_style(sev).apply_to(target))
     }
 
     #[inline]
     fn write_base(&mut self, target: impl fmt::Display) -> fmt::Result { write!(self.f.f, "{}", self.f.theme.source_base.apply_to(target)) }
 }
 impl<'s, 'a, 'f> PreReplaceLineFormatter<'s, 'a, 'f> {
+    /// Finishes rendering this line.
+    ///
+    /// # Errors
+    /// This function fails if we failed to write to the internal writer.
+    #[inline(always)]
+    pub fn finish(self) -> fmt::Result { writeln!(self.f.f) }
+}
+
+
+
+/// Allows one to write replacing source lines.
+pub struct AftReplaceFormatter<'s, 'a, 'f> {
+    max_line_no_width: usize,
+    f: &'s mut Formatter<'a, 'f>,
+}
+
+// Formatting
+impl<'s, 'a, 'f> AftReplaceFormatter<'s, 'a, 'f> {
+    /// Starts rendering a single aft replace source line.
+    ///
+    /// # Arguments
+    /// - `l`: The line number to write at the start of the line.
+    ///
+    /// # Returns
+    /// A [`AftReplaceLineFormatter`] that can be used to write the remainder of the snippet.
+    ///
+    /// # Errors
+    /// This function fails if we failed to write to the internal writer.
+    #[inline(always)]
+    pub fn start_line(&mut self, l: &str) -> Result<AftReplaceLineFormatter<'_, 'a, 'f>, fmt::Error> {
+        write_source_line_start(self.f.f, self.f.theme, self.max_line_no_width, '+', l)?;
+        Ok(AftReplaceLineFormatter { f: self.f })
+    }
+
+
+    /// Finishes rendering this replace snippet part.
+    #[inline(always)]
+    pub fn finish(self) {}
+}
+
+
+
+/// Allows one to write a replacing source line.
+pub struct AftReplaceLineFormatter<'s, 'a, 'f> {
+    f: &'s mut Formatter<'a, 'f>,
+}
+
+// Formatting
+impl<'s, 'a, 'f> fmt::Write for AftReplaceLineFormatter<'s, 'a, 'f> {
+    #[track_caller]
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        // Scan for newlines
+        if s.chars().find(|c| *c == '\n').is_some() {
+            panic!("Cannot write newlines to a AftReplaceLineFormatter");
+        }
+        self.f.f.write_str(s)
+    }
+}
+impl<'s, 'a, 'f> StyledWrite for AftReplaceLineFormatter<'s, 'a, 'f> {
+    #[inline]
+    fn write_highlighted(&mut self, sev: Severity, target: impl fmt::Display) -> fmt::Result {
+        write!(self.f.f, "{}", self.f.theme.source_highlight_style(sev).apply_to(target))
+    }
+
+    #[inline]
+    fn write_base(&mut self, target: impl fmt::Display) -> fmt::Result { write!(self.f.f, "{}", self.f.theme.source_base.apply_to(target)) }
+}
+impl<'s, 'a, 'f> AftReplaceLineFormatter<'s, 'a, 'f> {
     /// Finishes rendering this line.
     ///
     /// # Errors

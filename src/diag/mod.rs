@@ -72,15 +72,19 @@ mod tests {
         let diag = Diag::<u8>::error("Oh no, something went wrong!")
             .with_code("E000")
             .with_annot(Annotation::error(Loc::encapsulate_range(id, ..13)))
-            .with_annot(Annotation::suggestion(Loc::encapsulate_range(id, ..5)).with_replace(b"Goodbye"));
+            .with_annot(Annotation::suggestion(Loc::encapsulate_range(id, ..5)).with_replace(b"Goodbye"))
+            .with_note("Remember this");
+        let sdiag = diag.display(HexRenderer::new(100, &sources)).to_string();
+        println!("{sdiag}");
         assert_eq!(
-            diag.display(HexRenderer::new(100, &sources)).to_string(),
+            sdiag,
             r#"error[E000]: Oh no, something went wrong!
  --> example at 0
   |
 0 | 48 65 6c 6c  6f 2c 20 77  6f 72 6c 64  21             Hello, world!   
   | -----------------------------------------             -------------
   |
+  = note: Remember this
 suggestion: Consider this instead
  --> example at 0
   |

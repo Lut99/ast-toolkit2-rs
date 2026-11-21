@@ -60,9 +60,7 @@ impl<'a, 'f> Formatter<'a, 'f> {
     /// # Errors
     /// This function fails if we failed to write to the internal writer.
     #[inline(always)]
-    pub fn write_message(&mut self, sev: Severity, msg: &str) -> fmt::Result {
-        write_header(self.f, self.theme, self.max_line_width, false, sev, msg)
-    }
+    pub fn write_message(&mut self, sev: Severity, msg: &str) -> fmt::Result { write_header(self.f, self.theme, self.max_line_width, sev, msg) }
 }
 
 

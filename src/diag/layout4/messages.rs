@@ -25,40 +25,79 @@ pub(super) enum Message<'d, E> {
 
 
 /// A "main" message contains the original error message and most annotations.
+#[derive(Clone, Debug)]
 pub struct MessageMain<'d> {
     /// The severity of the message.
-    pub(super) sev:      Severity,
+    pub sev:      Severity,
     /// Any code in the message.
-    pub(super) code:     Option<&'d str>,
+    pub code:     Option<&'d str>,
     /// The message of the message.
-    pub(super) msg:      &'d str,
+    pub msg:      &'d str,
     /// The notes in the message
-    pub(super) notes:    &'d [String],
+    pub notes:    &'d [String],
     /// The snippets to show for this message.
-    pub(super) snippets: Vec<Snippet<'d>>,
+    pub snippets: Vec<Snippet<'d>>,
 }
 
 /// A group of annotations beloning to the (same area of the) same source.
-pub(super) struct Snippet<'d> {
+#[derive(Clone, Debug)]
+pub struct Snippet<'d> {
     /// The source ID of the snippet to show.
-    pub(super) source_id: u64,
+    pub source_id: u64,
     /// A single snippet to show. It has one or more annotations to show within it.
-    pub(super) annots:    Vec<Annot<'d>>,
+    pub annots:    Vec<Annot<'d>>,
 }
 
 /// A single highlighting of source text.
-pub(super) struct Annot<'d> {
+#[derive(Clone, Copy, Debug)]
+pub struct Annot<'d> {
     /// The message of this annotation, if any.
-    pub(super) msg:   Option<&'d str>,
+    pub msg:   Option<&'d str>,
     /// The severity of this annotation.
-    pub(super) sev:   Severity,
+    pub sev:   Severity,
     /// The range of this annotation.
-    pub(super) range: Range,
+    pub range: Range,
+}
+impl<'d> Annot<'d> {
+    /// Returns a set of LineAnnots that represent this annotation split over multiple lines.
+    ///
+    /// # Arguments
+    /// - `ranges`: The new ranges that this annotation will be split over. Note that it is your
+    ///   responsibility to ensure these are correct and do not exceed the original annot's
+    ///   `range`.
+    #[track_caller]
+    pub fn split_over_lines(self, ranges: impl IntoIterator<Item = (usize, usize)>) -> Vec<LineAnnot<'d>> {
+        // Get the first to carry the message
+        let mut ranges = ranges.into_iter();
+        let size_hint = ranges.size_hint();
+        let (first_pos, first_len) = ranges.next().unwrap_or_else(|| panic!("You must give at least one range to Annot::split_over_lines()"));
+        let mut res = Vec::with_capacity(size_hint.1.unwrap_or(size_hint.0));
+        res.push(LineAnnot { msg: self.msg, sev: self.sev, range: (first_pos, first_len) });
+
+        // The rest does not, only highlights
+        for (rem_pos, rem_len) in ranges {
+            res.push(LineAnnot { msg: None, sev: self.sev, range: (rem_pos, rem_len) });
+        }
+        res
+    }
+}
+
+/// A single [`Annot`]atation scoped to a single line.
+#[derive(Clone, Copy, Debug)]
+#[cfg_attr(test, derive(Eq, PartialEq))]
+pub struct LineAnnot<'d> {
+    /// The message of this annotation, if any.
+    pub msg:   Option<&'d str>,
+    /// The severity of this annotation.
+    pub sev:   Severity,
+    /// The range of this annotation, relative to a line.
+    pub range: (usize, usize),
 }
 
 
 
 /// A "replace" message contains a single annotation showing a suggested replacement.
+#[derive(Clone, Copy, Debug)]
 pub struct MessageReplace<'d, E> {
     /// The source ID of the (only) snippet to show.
     pub source_id: u64,
@@ -75,6 +114,7 @@ pub struct MessageReplace<'d, E> {
 
 
 /// A "sourceless" message has no annotations whatsoever and, therefore, no source text.
+#[derive(Clone, Copy, Debug)]
 pub struct MessageSourceless<'d> {
     /// The severity of the message.
     pub sev: Severity,

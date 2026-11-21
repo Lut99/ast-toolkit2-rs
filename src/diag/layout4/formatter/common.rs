@@ -15,10 +15,34 @@ use super::super::super::themes::Theme;
 
 
 /***** LIBRARY *****/
+/// Writes a given character `n` times.
+pub struct Repeat(pub char, pub usize);
+impl fmt::Display for Repeat {
+    #[inline(always)]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for _ in 0..self.1 {
+            write!(f, "{}", self.0)?;
+        }
+        Ok(())
+    }
+}
+
+
+
+
+
+/***** LIBRARY FUNCTIONS *****/
 /// Function that writes the given string to `f` linewrapped.
 ///
 /// Note that this function completely re-writes all whitespace in the string to spaces.
-pub fn write_linewrapped(f: &mut fmt::Formatter<'_>, max_line_width: usize, mut col: usize, style: &Style, s: &str) -> fmt::Result {
+pub fn write_linewrapped(
+    f: &mut fmt::Formatter<'_>,
+    max_line_width: usize,
+    mut col: usize,
+    style: &Style,
+    newline_padding: usize,
+    s: &str,
+) -> fmt::Result {
     let mut first: bool = true;
     for mut word in s.split_whitespace() {
         // If the word would cause the line to overflow, write a newline first
@@ -26,6 +50,7 @@ pub fn write_linewrapped(f: &mut fmt::Formatter<'_>, max_line_width: usize, mut 
         let mut word_len: usize = word.graphemes(true).count();
         if col > 0 && col + space_len + word_len > max_line_width {
             writeln!(f)?;
+            write!(f, "{}", Repeat(' ', newline_padding))?;
             col = 0;
             space_len = 0;
         }
@@ -34,6 +59,7 @@ pub fn write_linewrapped(f: &mut fmt::Formatter<'_>, max_line_width: usize, mut 
         while word_len > max_line_width {
             let i: usize = word.grapheme_indices(true).map(|(i, _)| i).take(max_line_width + 1).last().unwrap();
             writeln!(f, "{}", style.apply_to(&word[..i]))?;
+            write!(f, "{}", Repeat(' ', newline_padding))?;
             word = &word[i..];
             word_len -= max_line_width;
         }
@@ -51,8 +77,31 @@ pub fn write_linewrapped(f: &mut fmt::Formatter<'_>, max_line_width: usize, mut 
 
 
 
+/// Function writing the standard *main message header.
+pub fn write_header_main(
+    f: &mut fmt::Formatter<'_>,
+    theme: &Theme,
+    max_line_width: usize,
+    sev: Severity,
+    code: Option<&str>,
+    msg: &str,
+) -> fmt::Result {
+    let sev_style = theme.header_severity_style(sev);
+    let code_style = &theme.header_code;
+    let msg_style = &theme.header_extra_msg;
+
+    // Write the initial severity
+    let ssev: &str = sev.as_str();
+    let scode: String = if let Some(code) = code { format!("[{code}]") } else { String::new() };
+    write!(f, "{}{}{}", sev_style.apply_to(ssev), code_style.apply_to(&scode), msg_style.apply_to(": "))?;
+
+    // Write the message linewrapped
+    write_linewrapped(f, max_line_width, ssev.len() + scode.graphemes(true).count() + 2, &theme.header_extra_msg, 0, msg)?;
+    writeln!(f)
+}
+
 /// Function writing the standard message header.
-pub fn write_header(f: &mut fmt::Formatter<'_>, theme: &Theme, max_line_width: usize, is_main: bool, sev: Severity, msg: &str) -> fmt::Result {
+pub fn write_header(f: &mut fmt::Formatter<'_>, theme: &Theme, max_line_width: usize, sev: Severity, msg: &str) -> fmt::Result {
     let sev_style = theme.header_severity_style(sev);
     let msg_style = &theme.header_extra_msg;
 
@@ -61,7 +110,7 @@ pub fn write_header(f: &mut fmt::Formatter<'_>, theme: &Theme, max_line_width: u
     write!(f, "{}{}", sev_style.apply_to(ssev), msg_style.apply_to(": "))?;
 
     // Write the message linewrapped
-    write_linewrapped(f, max_line_width, ssev.len() + 2, if is_main { &theme.header_main_msg } else { &theme.header_extra_msg }, msg)?;
+    write_linewrapped(f, max_line_width, ssev.len() + 2, &theme.header_extra_msg, 0, msg)?;
     writeln!(f)
 }
 
@@ -105,7 +154,7 @@ mod tests {
     struct Display<'s>(usize, usize, &'s str);
     impl<'s> fmt::Display for Display<'s> {
         #[inline]
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write_linewrapped(f, self.0, self.1, &Style::new(), self.2) }
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write_linewrapped(f, self.0, self.1, &Style::new(), 0, self.2) }
     }
 
     #[test]
