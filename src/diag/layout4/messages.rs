@@ -10,9 +10,85 @@ use super::super::diag::Diag;
 use crate::loc::Range;
 
 
-/***** HELPER FUNCTIONS *****/
+/***** AST *****/
+/// Defines all possible messages that we will render.
+pub(super) enum Message<'d, E> {
+    /// A "standard" message containing a main message and one or more annotations, but with a
+    /// source text.
+    Main(MessageMain<'d>),
+    /// A message with a source text but also that replaces source text.
+    Replace(MessageReplace<'d, E>),
+    /// A message without any source text.
+    Sourceless(MessageSourceless<'d>),
+}
+
+
+
+/// A "main" message contains the original error message and most annotations.
+pub struct MessageMain<'d> {
+    /// The severity of the message.
+    pub(super) sev:      Severity,
+    /// Any code in the message.
+    pub(super) code:     Option<&'d str>,
+    /// The message of the message.
+    pub(super) msg:      &'d str,
+    /// The notes in the message
+    pub(super) notes:    &'d [String],
+    /// The snippets to show for this message.
+    pub(super) snippets: Vec<Snippet<'d>>,
+}
+
+/// A group of annotations beloning to the (same area of the) same source.
+pub(super) struct Snippet<'d> {
+    /// The source ID of the snippet to show.
+    pub(super) source_id: u64,
+    /// A single snippet to show. It has one or more annotations to show within it.
+    pub(super) annots:    Vec<Annot<'d>>,
+}
+
+/// A single highlighting of source text.
+pub(super) struct Annot<'d> {
+    /// The message of this annotation, if any.
+    pub(super) msg:   Option<&'d str>,
+    /// The severity of this annotation.
+    pub(super) sev:   Severity,
+    /// The range of this annotation.
+    pub(super) range: Range,
+}
+
+
+
+/// A "replace" message contains a single annotation showing a suggested replacement.
+pub struct MessageReplace<'d, E> {
+    /// The source ID of the (only) snippet to show.
+    pub(super) source_id: u64,
+    /// The severity of the message/(only) annotation.
+    pub(super) sev: Severity,
+    /// The message of the message/(only) annotation.
+    pub(super) msg: &'d str,
+    /// The replacement to make.
+    pub(super) repl: &'d [E],
+    /// The range of the (only) annotation.
+    pub(super) range: Range,
+}
+
+
+
+/// A "sourceless" message has no annotations whatsoever and, therefore, no source text.
+pub struct MessageSourceless<'d> {
+    /// The severity of the message.
+    pub(super) sev: Severity,
+    /// The message of the message.
+    pub(super) msg: &'d str,
+}
+
+
+
+
+
+/***** LIBRARY *****/
 /// Takes a [`Diag`] and outputs a set of [`Message`]s.
-pub fn as_messages<'d, E>(diag: &'d Diag<E>) -> std::vec::IntoIter<Message<'d, E>> {
+pub(super) fn as_messages<'d, E>(diag: &'d Diag<E>) -> std::vec::IntoIter<Message<'d, E>> {
     // Create the main snippet
     let mut main = MessageMain {
         sev:      diag.sev,
@@ -64,80 +140,4 @@ pub fn as_messages<'d, E>(diag: &'d Diag<E>) -> std::vec::IntoIter<Message<'d, E
     // OK, done
     messages.insert(0, Message::Main(main));
     messages.into_iter()
-}
-
-
-
-
-
-/***** LIBRARY *****/
-/// Defines all possible messages that we will render.
-pub enum Message<'d, E> {
-    /// A "standard" message containing a main message and one or more annotations, but with a
-    /// source text.
-    Main(MessageMain<'d>),
-    /// A message with a source text but also that replaces source text.
-    Replace(MessageReplace<'d, E>),
-    /// A message without any source text.
-    Sourceless(MessageSourceless<'d>),
-}
-
-
-
-/// A "main" message contains the original error message and most annotations.
-pub struct MessageMain<'d> {
-    /// The severity of the message.
-    pub(super) sev:      Severity,
-    /// Any code in the message.
-    pub(super) code:     Option<&'d str>,
-    /// The message of the message.
-    pub(super) msg:      &'d str,
-    /// The notes in the message
-    pub(super) notes:    &'d [String],
-    /// The snippets to show for this message.
-    pub(super) snippets: Vec<Snippet<'d>>,
-}
-
-/// A group of annotations beloning to the (same area of the) same source.
-struct Snippet<'d> {
-    /// The source ID of the snippet to show.
-    pub(super) source_id: u64,
-    /// A single snippet to show. It has one or more annotations to show within it.
-    pub(super) annots:    Vec<Annot<'d>>,
-}
-
-/// A single highlighting of source text.
-struct Annot<'d> {
-    /// The message of this annotation, if any.
-    pub(super) msg:   Option<&'d str>,
-    /// The severity of this annotation.
-    pub(super) sev:   Severity,
-    /// The range of this annotation.
-    pub(super) range: Range,
-}
-
-
-
-/// A "replace" message contains a single annotation showing a suggested replacement.
-pub struct MessageReplace<'d, E> {
-    /// The source ID of the (only) snippet to show.
-    pub(super) source_id: u64,
-    /// The severity of the message/(only) annotation.
-    pub(super) sev: Severity,
-    /// The message of the message/(only) annotation.
-    pub(super) msg: &'d str,
-    /// The replacement to make.
-    pub(super) repl: &'d [E],
-    /// The range of the (only) annotation.
-    pub(super) range: Range,
-}
-
-
-
-/// A "sourceless" message has no annotations whatsoever and, therefore, no source text.
-pub struct MessageSourceless<'d> {
-    /// The severity of the message.
-    pub(super) sev: Severity,
-    /// The message of the message.
-    pub(super) msg: &'d str,
 }

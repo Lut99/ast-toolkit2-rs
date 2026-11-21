@@ -21,27 +21,49 @@ pub mod renderers;
 // Imports & Exports
 use std::fmt;
 
-pub use formatter::Formatter;
-pub use messages::{Message, MessageMain, MessageReplace, MessageSourceless, as_messages};
+pub use formatter::sourceless;
+use messages::{Message, as_messages};
 
 use super::Diag;
 
 
 /***** INTERFACES *****/
-pub trait Renderer<'d, E: 'd> {
-    /// Renders a source array of `E`lements to the given [`Formatter`].
-    ///
-    /// Note that this is _not_ a [`std::fmt::Formatter`]. Instead, it is a custom type that writes
-    /// the standardized parts to an internal output stream.
+pub trait Renderer<E> {
+    /// Renders a [`MessageMain`] to the given `f`ormatter.
     ///
     /// # Arguments
     /// - `f`: A [`Formatter`] to write to.
-    /// - `messages`: A stream of [`Message`]s to show. Each of these is a separate thing to
-    ///   output, where each such they may be subdivided into multiple snippets.
+    /// - `msg`: A single message to render. This one represents the main message and can have
+    ///   zero or more _snippets_ of source text with zero or more _annotations_.
     ///
     /// # Errors
     /// This function should only error if it failed to interact with `f`.
-    fn render(&mut self, f: Formatter<'_>, messages: impl Iterator<Item = Message<'d, E>>) -> fmt::Result;
+    fn render_main(&self, f: (), msg: ()) -> fmt::Result;
+
+    /// Renders a [`MessageReplace`] to the given `f`ormatter.
+    ///
+    /// # Arguments
+    /// - `f`: A [`Formatter`] to write to.
+    /// - `msg`: A single message to render. This one represents a single annotation showing a
+    ///   suggested replacement.
+    ///
+    /// # Errors
+    /// This function should only error if it failed to interact with `f`.
+    fn render_replace(&self, f: (), msg: ()) -> fmt::Result;
+
+    /// Renders a [`sourceless::Message`] to the given `f`ormatter.
+    ///
+    /// This function doesn't really require you to do anything except give the proper line width,
+    /// if any.
+    ///
+    /// # Arguments
+    /// - `f`: A [`sourceless::Formatter`] to write to.
+    /// - `msg`: A single message to render. This one represents a single annotation showing a
+    ///   suggested replacement.
+    ///
+    /// # Errors
+    /// This function should only error if it failed to interact with `f`.
+    fn render_sourceless(&self, f: sourceless::Formatter<'_, '_>, msg: sourceless::Message<'_>) -> fmt::Result;
 }
 
 
@@ -55,10 +77,17 @@ pub struct Display<'d, R, E> {
     diag:     &'d Diag<E>,
 }
 
-impl<'d, R: Renderer<'d, E>, E> fmt::Display for Display<'d, R, E> {
+impl<'d, R: Renderer<E>, E> fmt::Display for Display<'d, R, E> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let msgs = as_messages(self.diag);
-        todo!()
+        for msg in msgs {
+            match msg {
+                Message::Main(m) => self.renderer.render_main((), ())?,
+                Message::Replace(m) => self.renderer.render_replace((), ())?,
+                Message::Sourceless(m) => self.renderer.render_sourceless(sourceless::Formatter::new(&self.diag.theme, f), m)?,
+            }
+        }
+        Ok(())
     }
 }
 
@@ -78,5 +107,5 @@ impl<E> Diag<E> {
     /// # Returns
     /// A [`Display`] implementing [`Display`](fmt::Display).
     #[inline]
-    pub const fn display<'d, R: Renderer<'d, E>>(&'d self, renderer: R) -> Display<'d, R, E> { Display { renderer, diag: self } }
+    pub const fn display<R: Renderer<E>>(&self, renderer: R) -> Display<'_, R, E> { Display { renderer, diag: self } }
 }
