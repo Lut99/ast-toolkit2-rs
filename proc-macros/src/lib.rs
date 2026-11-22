@@ -437,10 +437,13 @@ pub fn derive_parsable(item: TokenStream) -> TokenStream {
 
 
 // ast_toolkit2::tree
-/// A procedural macro for automatically deriving the `Node`-, `NonTerm`- and `Term`-traits.
+/// A procedural macro for automatically deriving the `Node`-, and `NodeMut`-traits.
+///
+/// The former can be used to iterate over a node's children by read-only reference. Because we
+/// also sometimes want mutable access, `NodeMut` is derived in addition.
 ///
 /// # Usage
-/// There is three flavours to deriving your type.
+/// There is three flavours to deriving your type, configurable using attributes.
 ///
 /// ## Nonterminals
 /// Nonterminals are branches in your tree. Derive them using the `#[node(nonterm)]`-attribute.
@@ -457,7 +460,7 @@ pub fn derive_parsable(item: TokenStream) -> TokenStream {
 /// # Examples
 /// All of them together:
 /// ```ignore
-/// use ast_toolkit2::tree::{Node, NonTerm, Term};
+/// use ast_toolkit2::tree::Node;
 ///
 /// #[derive(Node)]
 /// #[node(nonterm)]
@@ -473,23 +476,46 @@ pub fn derive_parsable(item: TokenStream) -> TokenStream {
 ///
 ///
 /// fn assert_node<T: Node>() {}
-/// fn assert_nonterm<T: NonTerm>() {}
-/// fn assert_term<T: Term>() {}
 ///
 /// assert_node::<Sentence>();
-/// assert_nonterm::<Sentence>();
-/// // assert_term::<Sentence>();
 /// assert_node::<LitInt>();
-/// // assert_nonterm::<LitInt>();
-/// assert_term::<LitInt>();
 /// assert_node::<Dot>();
-/// // assert_nonterm::<Dot>();
-/// assert_term::<Dot>();
+/// ```
+///
+/// ## Non-mutable implementation
+/// Sometimes, your type cannot iterate over its children mutably but it _can_ iterate immutably.
+/// For example, consider [`std::rc::Rc`].
+/// If that's the case, avoid deriving `NodeMut` by using the `#[node(nomut)]`-attribute:
+/// ```ignore
+/// use std::rc::Rc;
+///
+/// use ast_toolkit2::tree::{Node, NodeMut};
+///
+/// #[derive(Node)]
+/// struct Mutable(Base);
+///
+/// #[derive(Node)]
+/// #[node(nomut)]
+/// struct Immutable(Rc<Base>);
+///
+/// #[derive(Node)]
+/// struct Base;
+///
+///
+/// fn assert_node<T: Node>() {}
+/// fn assert_node_mut<T: NodeMut>() {}
+///
+/// assert_node::<Mutable>();
+/// assert_node_mut::<Mutable>();
+/// assert_node::<Immutable>();
+/// // assert_node_mut::<Immutable>();
+/// assert_node::<Base>();
+/// assert_node_mut::<Base>();
 /// ```
 ///
 /// # A note on generics
-/// All generic types of your struct will require `Node` to have `Node`, `NonTerm` or `Term`
-/// implemented.
+/// All generic types of your struct will require `Node` to have `Node` implemented, and `NodeMut`
+/// to have `NodeMut` implemented.
 #[cfg(feature = "tree")]
 #[proc_macro_derive(Node, attributes(node))]
 pub fn derive_node(item: TokenStream) -> TokenStream {

@@ -8,12 +8,15 @@
 //
 
 use ast_toolkit2::loc::{Loc, Located};
-use ast_toolkit2::tree::Node;
+use ast_toolkit2::tree::{Node, NodeMut};
 
 
 /***** HELPER FUNCTIONS *****/
 /// Asserts whether a type implements [`Node`].
 fn assert_node<T: Node>() {}
+
+/// Asserts whether a type implements [`NodeMut`].
+fn assert_node_mut<T: NodeMut>() {}
 
 
 
@@ -36,8 +39,11 @@ fn test_derive_node_structs() {
 
 
     assert_node::<StructSimple>();
+    assert_node_mut::<StructSimple>();
     assert_node::<TupleSimple>();
+    assert_node_mut::<StructSimple>();
     assert_node::<TupleGen<TupleSimple>>();
+    assert_node_mut::<StructSimple>();
 }
 
 #[test]
@@ -49,4 +55,5 @@ fn test_derive_node_enums() {
     }
 
     assert_node::<EnumSimple>();
+    assert_node_mut::<EnumSimple>();
 }
