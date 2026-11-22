@@ -12,10 +12,9 @@ use quote::{ToTokens, quote};
 use syn::punctuated::Punctuated;
 use syn::{Error, Generics, Ident, Path, PathArguments, PathSegment, Token, Type, TypePath, Variant, Visibility};
 
-use super::super::VariantAttr;
 use super::super::aux::{Err, ErrInfo, Fmt, FmtInfo, identity_path, inject_parsable_bound};
 use super::super::seq::{FieldInfo, StructTy, cook_up_error_mod_name};
-use crate::derive_parsable::parse_parse_attrs;
+use super::super::{VariantAttr, parse_parse_attrs};
 
 
 /***** GENERATORS *****/

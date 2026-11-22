@@ -5,17 +5,21 @@
 //!   Defines common algorithms and utilities used across derive macros.
 //
 
-use proc_macro2::{Punct, Spacing, Span, TokenStream as TokenStream2, TokenTree as TokenTree2};
+use proc_macro2::Span;
+#[cfg(feature = "diag")]
+use proc_macro2::{Punct, Spacing, TokenStream as TokenStream2, TokenTree as TokenTree2};
+#[cfg(feature = "diag")]
 use quote::ToTokens;
 use syn::punctuated::Punctuated;
-use syn::{
-    AngleBracketedGenericArguments, GenericArgument, GenericParam, Generics, Ident, Path, PathArguments, PathSegment, TraitBound, Type,
-    TypeParamBound, TypePath,
-};
+#[cfg(feature = "diag")]
+use syn::{AngleBracketedGenericArguments, GenericArgument, GenericParam, Type, TypePath};
+use syn::{Generics, Ident, Path, PathArguments, PathSegment, TraitBound, TypeParamBound};
 
 
 /***** HELPER *****/
+#[cfg(feature = "diag")]
 pub struct ImplGen<'e, 'g>(&'e [&'e str], &'g Generics);
+#[cfg(feature = "diag")]
 impl<'e, 'g> ToTokens for ImplGen<'e, 'g> {
     #[inline]
     fn to_tokens(&self, tokens: &mut TokenStream2) {
@@ -54,7 +58,9 @@ impl<'e, 'g> ToTokens for ImplGen<'e, 'g> {
     }
 }
 
+#[cfg(feature = "diag")]
 pub struct TyGen<'g>(&'g Generics);
+#[cfg(feature = "diag")]
 impl<'g> ToTokens for TyGen<'g> {
     #[inline]
     fn to_tokens(&self, tokens: &mut TokenStream2) {
@@ -85,7 +91,9 @@ impl<'g> ToTokens for TyGen<'g> {
     }
 }
 
+#[cfg(feature = "diag")]
 pub struct WhereGen<'g>(&'g Generics);
+#[cfg(feature = "diag")]
 impl<'g> ToTokens for WhereGen<'g> {
     #[inline]
     fn to_tokens(&self, tokens: &mut TokenStream2) {
@@ -174,6 +182,7 @@ pub fn inject_trait_bound<const LEN: usize>(path: [&'static str; LEN], gens: &mu
 ///   to-be-implemented trait.
 /// - `args`: A list of arguments to give to the path.
 /// - `gens`: The [`Generics`] to inject the additional trait bounds in.
+#[cfg(feature = "diag")]
 pub fn inject_trait_bound_with_args<const LEN: usize>(path: [&'static str; LEN], args: &[&str], gens: &mut Generics) {
     for param in gens.type_params_mut() {
         param.bounds.push(TypeParamBound::Trait(TraitBound {
@@ -238,6 +247,7 @@ pub fn inject_trait_bound_with_args<const LEN: usize>(path: [&'static str; LEN],
 /// # Returns
 /// A triplet of [`ImplGen`], [`TyGen`] and [`WhereGen`] that each render the three parts of the
 /// generics.
+#[cfg(feature = "diag")]
 pub const fn split_for_impl_with_extra<'e, 'g>(extra: &'e [&'e str], gens: &'g Generics) -> (ImplGen<'e, 'g>, TyGen<'g>, WhereGen<'g>) {
     (ImplGen(extra, gens), TyGen(gens), WhereGen(gens))
 }

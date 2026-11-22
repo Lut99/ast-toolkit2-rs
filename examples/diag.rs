@@ -5,8 +5,7 @@
 //!   Showcase of pretty rendered diagnostics.
 //
 
-use ast_toolkit2::diag::layout4::Renderer;
-use ast_toolkit2::diag::layout4::renderers::{HexRenderer, Utf8Renderer};
+use ast_toolkit2::diag::renderers::{HexRenderer, Renderer, Utf8Renderer};
 use ast_toolkit2::diag::{Annotation, Diag, Theme};
 use ast_toolkit2::loc::Loc;
 use ast_toolkit2::sources::Sources;

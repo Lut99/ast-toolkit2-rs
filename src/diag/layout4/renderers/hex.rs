@@ -13,7 +13,8 @@ use std::ops::Index;
 use super::super::super::annots::Severity;
 use super::super::formatter::replace::AftReplaceFormatter;
 use super::super::messages::LineAnnot;
-use super::super::{Renderer, StyledWrite, main, replace, sourceless};
+use super::super::{StyledWrite, main, replace, sourceless};
+use super::Renderer;
 use crate::loc::Range;
 use crate::sources::Sources;
 

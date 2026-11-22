@@ -6,7 +6,7 @@
 //
 
 // Modules
-#[cfg(any(feature = "loc", feature = "tree"))]
+#[cfg(any(feature = "diag", feature = "loc", feature = "tree"))]
 mod common;
 #[cfg(feature = "diag")]
 mod derive_diagnostic;

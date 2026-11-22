@@ -13,52 +13,19 @@
 //
 
 // Modules
-mod formatter;
+pub mod formatter;
 mod messages;
-#[cfg(feature = "sources")]
 pub mod renderers;
 
-use std::cell::{Ref, RefMut};
 // Imports & Exports
 use std::fmt;
-use std::rc::Rc;
-use std::sync::{Arc, MutexGuard, RwLockReadGuard, RwLockWriteGuard};
 
-pub use formatter::{main, replace, sourceless};
+use formatter::{main, replace, sourceless};
 use messages::{Message, as_messages};
+use renderers::Renderer;
 
 use super::Diag;
 use super::annots::Severity;
-
-
-/***** HELPER MACROS *****/
-macro_rules! renderer_ptr_impl {
-    (__impl) => {
-        fn render_main<'d>(&self, f: main::Formatter<'d, '_>, msg: main::Message<'d>) -> fmt::Result { <T as Renderer<E>>::render_main(self, f, msg) }
-
-        fn render_replace<'d>(&self, f: replace::Formatter<'d, '_>, msg: replace::Message<'d, E>) -> fmt::Result {
-            <T as Renderer<E>>::render_replace(self, f, msg)
-        }
-
-        fn render_sourceless<'d>(&self, f: sourceless::Formatter<'d, '_>, msg: sourceless::Message<'d>) -> fmt::Result {
-            <T as Renderer<E>>::render_sourceless(self, f, msg)
-        }
-    };
-
-    ('a, $ty:ty) => {
-        impl<'a, E, T: ?Sized + Renderer<E>> Renderer<E> for $ty {
-            renderer_ptr_impl!(__impl);
-        }
-    };
-    ($ty:ty) => {
-        impl<E, T: ?Sized + Renderer<E>> Renderer<E> for $ty {
-            renderer_ptr_impl!(__impl);
-        }
-    };
-}
-
-
-
 
 
 /***** INTERFACES *****/
@@ -83,59 +50,6 @@ impl<'a, T: StyledWrite> StyledWrite for &'a mut T {
     #[inline(always)]
     fn write_base(&mut self, target: impl fmt::Display) -> fmt::Result { <T as StyledWrite>::write_base(self, target) }
 }
-
-
-
-/// Interface that you can implement for a struct rendering source text.
-pub trait Renderer<E> {
-    /// Renders a [`MessageMain`] to the given `f`ormatter.
-    ///
-    /// # Arguments
-    /// - `f`: A [`Formatter`] to write to.
-    /// - `msg`: A single message to render. This one represents the main message and can have
-    ///   zero or more _snippets_ of source text with zero or more _annotations_.
-    ///
-    /// # Errors
-    /// This function should only error if it failed to interact with `f`.
-    fn render_main<'d>(&self, f: main::Formatter<'d, '_>, msg: main::Message<'d>) -> fmt::Result;
-
-    /// Renders a [`MessageReplace`] to the given `f`ormatter.
-    ///
-    /// # Arguments
-    /// - `f`: A [`Formatter`] to write to.
-    /// - `msg`: A single message to render. This one represents a single annotation showing a
-    ///   suggested replacement.
-    ///
-    /// # Errors
-    /// This function should only error if it failed to interact with `f`.
-    fn render_replace<'d>(&self, f: replace::Formatter<'d, '_>, msg: replace::Message<'d, E>) -> fmt::Result;
-
-    /// Renders a [`sourceless::Message`] to the given `f`ormatter.
-    ///
-    /// This function doesn't really require you to do anything except give the proper line width,
-    /// if any.
-    ///
-    /// # Arguments
-    /// - `f`: A [`sourceless::Formatter`] to write to.
-    /// - `msg`: A single message to render. This one represents a single annotation showing a
-    ///   suggested replacement.
-    ///
-    /// # Errors
-    /// This function should only error if it failed to interact with `f`.
-    fn render_sourceless<'d>(&self, f: sourceless::Formatter<'d, '_>, msg: sourceless::Message<'d>) -> fmt::Result;
-}
-
-// Pointer-like impls
-renderer_ptr_impl!('a, &'a T);
-renderer_ptr_impl!('a, &'a mut T);
-renderer_ptr_impl!(Box<T>);
-renderer_ptr_impl!(Rc<T>);
-renderer_ptr_impl!(Arc<T>);
-renderer_ptr_impl!('a, Ref<'a, T>);
-renderer_ptr_impl!('a, RefMut<'a, T>);
-renderer_ptr_impl!('a, MutexGuard<'a, T>);
-renderer_ptr_impl!('a, RwLockReadGuard<'a, T>);
-renderer_ptr_impl!('a, RwLockWriteGuard<'a, T>);
 
 
 

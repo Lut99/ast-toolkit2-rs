@@ -12,9 +12,8 @@ use syn::punctuated::Punctuated;
 use syn::spanned::Spanned as _;
 use syn::{Error, Field, Fields, Generics, Ident, Token, Type, Visibility};
 
-use super::aux::{Fmt, FmtInfo, identity_path, inject_parsable_bound, whitespace_pop_impl};
+use super::aux::{Err, ErrInfo, Fmt, FmtInfo, identity_path, inject_parsable_bound, whitespace_pop_impl};
 use super::{FieldAttr, OuterAttr, OuterAttribute, parse_parse_attrs};
-use crate::derive_parsable::aux::{Err, ErrInfo};
 
 
 /***** HELPER FUNCTIONS *****/

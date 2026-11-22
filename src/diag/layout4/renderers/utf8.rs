@@ -11,10 +11,11 @@ use std::hash::{BuildHasher, RandomState};
 use unicode_segmentation::UnicodeSegmentation;
 
 use super::super::super::annots::Severity;
+use super::super::StyledWrite;
 use super::super::formatter::replace::AftReplaceFormatter;
 use super::super::formatter::{main, replace, sourceless};
 use super::super::messages::LineAnnot;
-use super::super::{Renderer, StyledWrite};
+use super::Renderer;
 use crate::loc::Range;
 use crate::sources::Sources;
 

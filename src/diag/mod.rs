@@ -14,7 +14,7 @@ mod diag;
 // pub mod layout;
 // pub mod layout2;
 // pub mod layout3;
-pub mod layout4;
+mod layout4;
 mod themes;
 
 // Use 'em
@@ -22,6 +22,7 @@ pub use annots::{Annotation, Severity};
 #[cfg(feature = "proc-macros")]
 pub use ast_toolkit2_proc_macros::Diagnostic;
 pub use diag::Diag;
+pub use layout4::{formatter, renderers};
 // pub use layout::{RenderedDiag, Renderer};
 pub use themes::Theme;
 
