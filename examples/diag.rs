@@ -34,18 +34,18 @@ fn main() {
         if args.binary { Box::new(HexRenderer::new(100, &sources)) } else { Box::new(Utf8Renderer::new(100, &sources)) };
 
     // Sourceless error
-    let diag = Diag::error("You've attempted to listen to the tragedy of Darth Plagueis The Wise as a Jedi").with_theme(Theme::RUST);
+    let diag = Diag::error("You've attempted to listen to the tragedy of Darth Plagueis The Wise as a Jedi").with_theme(Theme::COLOR);
     println!("{}", diag.display(&renderer));
 
     // Error with source
     let diag = Diag::error("Sith lord detected")
-        .with_theme(Theme::RUST)
+        .with_theme(Theme::COLOR)
         .with_annot(Annotation::error(Loc::encapsulate_range(id, 33..56)).with_msg("He's here"));
     println!("{}", diag.display(&renderer));
 
     // Error with help
     let diag = Diag::warning("It seems like the Sith Lord loses his power")
-        .with_theme(Theme::RUST)
+        .with_theme(Theme::COLOR)
         .with_annot(Annotation::warning(Loc::encapsulate_range(id, 522..542)))
         .with_annot(Annotation::help(Loc::encapsulate_range(id, 573..579)).with_msg("This further solidifies that idea"));
     println!("{}", diag.display(&renderer));

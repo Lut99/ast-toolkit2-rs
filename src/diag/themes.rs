@@ -107,6 +107,36 @@ impl Theme {
         footer_note_msg: Style::new(),
     };
 
+    /// A colored colour scheme.
+    pub const COLOR: Self = Self {
+        header_error: Style::new().red().bold(),
+        header_help: Style::new().cyan().bold(),
+        header_suggestion: Style::new().green().bold(),
+        header_warn: Style::new().yellow().bold(),
+        header_code: Style::new().bold(),
+        header_main_msg: Style::new().bold(),
+        header_extra_msg: Style::new(),
+        header_loc: Style::new(),
+        header_line_number: Style::new().black().bold().bright(),
+
+        source_base: Style::new(),
+        source_error: Style::new(),
+        source_help: Style::new(),
+        source_suggestion: Style::new(),
+        source_warn: Style::new(),
+        source_replace_old: Style::new().red().bold(),
+        source_replace_new: Style::new().green().bold(),
+
+        marker_error: ('-', Style::new().red().bold()),
+        marker_help: ('^', Style::new().cyan().bold()),
+        marker_suggestion: ('+', Style::new().green().bold()),
+        marker_warn: ('-', Style::new().yellow().bold()),
+
+        scaffolding:     Style::new().black().bold().bright(),
+        footer_note:     Style::new().black().bold().bright(),
+        footer_note_msg: Style::new(),
+    };
+
     /// Simulates colors as used by the Rust compiler.
     pub const RUST: Self = Self {
         header_error: Style::new().red().bold(),
