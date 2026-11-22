@@ -144,6 +144,14 @@ pub fn write_source_line_start(f: &mut fmt::Formatter<'_>, theme: &Theme, max_li
 
 
 
+/// Function writing a snippet line indicating a break in source.
+pub fn write_break_line(f: &mut fmt::Formatter<'_>, theme: &Theme, max_line_no_width: usize) -> fmt::Result {
+    let scaffolding_style = &theme.scaffolding;
+    writeln!(f, "{}{}", scaffolding_style.apply_to(Repeat('.', max_line_no_width)), scaffolding_style.apply_to(".."))
+}
+
+
+
 
 
 /***** TESTS *****/

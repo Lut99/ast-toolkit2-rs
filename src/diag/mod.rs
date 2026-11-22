@@ -67,29 +67,88 @@ mod tests {
     #[test]
     fn test_diag_display_hex() {
         let mut sources = Sources::new();
-        let id = sources.add_bytes("example", b"Hello, world!");
+        let id1 = sources.add_bytes("example1", b"Hello, world!");
+        let id2 = sources.add_bytes("example2", b"01234567890123456789012345678901234567890123456789012345678901234567890123456789");
 
         let diag = Diag::<u8>::error("Oh no, something went wrong!")
             .with_code("E000")
-            .with_annot(Annotation::error(Loc::encapsulate_range(id, ..13)))
-            .with_annot(Annotation::suggestion(Loc::encapsulate_range(id, ..5)).with_replace(b"Goodbye"))
+            .with_annot(Annotation::error(Loc::encapsulate_range(id1, ..13)))
+            .with_annot(Annotation::suggestion(Loc::encapsulate_range(id1, ..5)).with_replace(b"Goodbye"))
             .with_note("Remember this");
         let sdiag = diag.display(HexRenderer::new(100, &sources)).to_string();
         println!("{sdiag}");
         assert_eq!(
             sdiag,
             r#"error[E000]: Oh no, something went wrong!
- --> example at 0
+ --> example1 at 0x0
   |
 0 | 48 65 6c 6c  6f 2c 20 77  6f 72 6c 64  21             Hello, world!   
   | -----------------------------------------             -------------
   |
   = note: Remember this
 suggestion: Consider this instead
- --> example at 0
+ --> example1 at 0x0
   |
 0 - 48 65 6c 6c  6f 2c 20 77  6f 72 6c 64  21             Hello, world!   
 0 + 47 6f 6f 64  62 79 65 2c  20 77 6f 72  6c 64 21       Goodbye, world!
+  |
+"#
+        );
+
+        let diag = Diag::<u8>::error("Two seperate lines are the problem")
+            .with_annot(Annotation::error(Loc::encapsulate_range(id2, ..8)))
+            .with_annot(Annotation::error(Loc::encapsulate_range(id2, 32..40)));
+        let sdiag = diag.display(HexRenderer::new(100, &sources)).to_string();
+        println!("{sdiag}");
+        assert_eq!(
+            sdiag,
+            r#"error: Two seperate lines are the problem
+ --> example2 at 0x0
+  |
+0 | 30 31 32 33  34 35 36 37  38 39 30 31  32 33 34 35    0123456789012345
+  | ------------------------                              --------
+1 | 36 37 38 39  30 31 32 33  34 35 36 37  38 39 30 31    6789012345678901
+2 | 32 33 34 35  36 37 38 39  30 31 32 33  34 35 36 37    2345678901234567
+  | ------------------------                              --------
+  |
+"#
+        );
+
+        let diag = Diag::<u8>::error("Two, more seperate lines are the problem")
+            .with_annot(Annotation::error(Loc::encapsulate_range(id2, ..8)))
+            .with_annot(Annotation::error(Loc::encapsulate_range(id2, 48..56)));
+        let sdiag = diag.display(HexRenderer::new(100, &sources)).to_string();
+        println!("{sdiag}");
+        assert_eq!(
+            sdiag,
+            r#"error: Two, more seperate lines are the problem
+ --> example2 at 0x0
+  |
+0 | 30 31 32 33  34 35 36 37  38 39 30 31  32 33 34 35    0123456789012345
+  | ------------------------                              --------
+1 | 36 37 38 39  30 31 32 33  34 35 36 37  38 39 30 31    6789012345678901
+2 | 32 33 34 35  36 37 38 39  30 31 32 33  34 35 36 37    2345678901234567
+3 | 38 39 30 31  32 33 34 35  36 37 38 39  30 31 32 33    8901234567890123
+  | ------------------------                              --------
+  |
+"#
+        );
+
+        let diag = Diag::<u8>::error("Two, way more seperate lines are the problem")
+            .with_annot(Annotation::error(Loc::encapsulate_range(id2, ..8)))
+            .with_annot(Annotation::error(Loc::encapsulate_range(id2, 64..72)));
+        let sdiag = diag.display(HexRenderer::new(100, &sources)).to_string();
+        println!("{sdiag}");
+        assert_eq!(
+            sdiag,
+            r#"error: Two, way more seperate lines are the problem
+ --> example2 at 0x0
+  |
+0 | 30 31 32 33  34 35 36 37  38 39 30 31  32 33 34 35    0123456789012345
+  | ------------------------                              --------
+...
+4 | 34 35 36 37  38 39 30 31  32 33 34 35  36 37 38 39    4567890123456789
+  | ------------------------                              --------
   |
 "#
         );

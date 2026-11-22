@@ -340,49 +340,74 @@ impl<'s, 'r, R: BuildHasher> Renderer<u8> for HexRenderer<'s, 'r, R> {
                 continue;
             }
 
-            // TODO: Change the below to include missing lines unless the distance is too great;
-            // insert a break symbol thingy then.
-            todo!();
-
             // First, get the relevant source as zero or more lines
             // A bit of gymnastics has to happen here to group the annotations together on the same
             // lines.
             let loc: String = format!("{} at 0x{:X}", name, snip.annots.first().map(|a| a.range.pos).unwrap());
             let ranges = self.range_to_2d(snip.source_id, snip.annots.iter().map(|a| a.range));
-            let mut annots_by_line = Vec::<(u64, Vec<LineAnnot>)>::new();
+            let mut annots_by_line = Vec::<(Option<u64>, Vec<LineAnnot>)>::new();
             for (annot, ranges) in snip.annots.into_iter().zip(ranges) {
                 for (annot, (line, _)) in annot.split_over_lines(ranges.iter().map(|(_, range)| *range)).into_iter().zip(ranges) {
-                    match annots_by_line.iter_mut().find(|(l, _)| *l == line) {
+                    match annots_by_line.iter_mut().find(|(l, _)| l.unwrap() == line) {
                         Some(annots) => annots.1.push(annot),
-                        None => annots_by_line.push((line, vec![annot])),
+                        None => annots_by_line.push((Some(line), vec![annot])),
                     }
                 }
             }
             annots_by_line.sort_by_key(|(l, _)| *l);
+
+            // Insert missing lines, OR insert a "break" line without annotations.
+            let mut prev = annots_by_line.first().map(|(l, _)| l.unwrap());
+            let mut i: usize = 0;
+            while i < annots_by_line.len() {
+                let l = annots_by_line[i].0.unwrap();
+                let p = prev.unwrap();
+                if p + 2 == l {
+                    // There's precisely one line missing. Add it without annotations!
+                    annots_by_line.insert(i, (Some(p + 1), Vec::new()));
+                    i += 1;
+                } else if p + 3 == l {
+                    // There's precisely two lines missing. Add them without annotations!
+                    annots_by_line.insert(i, (Some(p + 1), Vec::new()));
+                    annots_by_line.insert(i + 1, (Some(p + 2), Vec::new()));
+                    i += 2;
+                } else if p + 3 < l {
+                    // There's more than two lines missing. Add the break
+                    annots_by_line.insert(i, (None, Vec::new()));
+                    i += 2;
+                }
+                i += 1;
+                prev = Some(l);
+            }
 
             // Start a snippet and go over all lines to draw them
             let mut snippet = message.start_snippet(&loc)?;
             for (l, mut annots) in annots_by_line {
                 annots.sort_by_key(|a| a.range.0);
 
-                // Write the source line
-                let mut line = snippet.start_source_line(&format!("{l:X}"))?;
-                self.write_line(&mut line, snip.source_id, l, annots.iter().map(|a| (a.sev, a.range)).collect())?;
-                line.finish()?;
+                if let Some(l) = l {
+                    // Write the source line
+                    let mut line = snippet.start_source_line(&format!("{l:X}"))?;
+                    self.write_line(&mut line, snip.source_id, l, annots.iter().map(|a| (a.sev, a.range)).collect())?;
+                    line.finish()?;
 
-                // Compute the rendered annotations to show on the resulting line
-                let annots = Self::compute_rendered_ranges(annots);
-                let mut rendered_annots = Vec::with_capacity(2 * annots.len());
-                for (annot, bin_range, ascii_range) in annots {
-                    rendered_annots.push(LineAnnot { msg: annot.msg, sev: annot.sev, range: bin_range });
-                    rendered_annots.push(LineAnnot { msg: None, sev: annot.sev, range: ascii_range });
+                    // Compute the rendered annotations to show on the resulting line
+                    let annots = Self::compute_rendered_ranges(annots);
+                    let mut rendered_annots = Vec::with_capacity(2 * annots.len());
+                    for (annot, bin_range, ascii_range) in annots {
+                        rendered_annots.push(LineAnnot { msg: annot.msg, sev: annot.sev, range: bin_range });
+                        rendered_annots.push(LineAnnot { msg: None, sev: annot.sev, range: ascii_range });
+                    }
+
+                    // Write the annotation line
+                    let mut lines = snippet.start_annot_lines();
+                    let extra_notes_len = extra_notes.len();
+                    extra_notes.extend(lines.write_annots(extra_notes_len, rendered_annots)?);
+                    lines.finish();
+                } else {
+                    // Write the break line to indicate there's source skipped
+                    snippet.write_break_line()?;
                 }
-
-                // Write the annotation line
-                let mut lines = snippet.start_annot_lines();
-                let extra_notes_len = extra_notes.len();
-                extra_notes.extend(lines.write_annots(extra_notes_len, rendered_annots)?);
-                lines.finish();
             }
 
             // Finish writing the snippet

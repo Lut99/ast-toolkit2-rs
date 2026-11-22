@@ -11,7 +11,7 @@ use super::super::super::annots::Severity;
 use super::super::super::themes::Theme;
 use super::super::StyledWrite;
 pub use super::super::messages::{LineAnnot, MessageMain as Message};
-use super::common::{Repeat, write_empty_source_line, write_header_main, write_linewrapped, write_loc, write_source_line_start};
+use super::common::{Repeat, write_break_line, write_empty_source_line, write_header_main, write_linewrapped, write_loc, write_source_line_start};
 use super::place::{Draw, place_annots};
 
 
@@ -199,6 +199,13 @@ impl<'s, 'd, 'f> SnippetFormatter<'s, 'd, 'f> {
     pub const fn start_annot_lines(&mut self) -> AnnotLinesFormatter<'_, 'd, 'f> {
         AnnotLinesFormatter { max_line_no_width: self.max_line_no_width, f: self.f }
     }
+
+    /// Writes the "break" line in source text.
+    ///
+    /// # Errors
+    /// This function fails if we failed to write to the internal writer.
+    #[inline(always)]
+    pub fn write_break_line(&mut self) -> fmt::Result { write_break_line(self.f.f, self.f.theme, self.max_line_no_width) }
 
 
     /// Finishes rendering this replace snippet part.
