@@ -58,13 +58,13 @@ macro_rules! located_collection_impl {
 
 macro_rules! located_ptr_impl {
     ('a, $ty:ty) => {
-        impl<'a, T: Located> Located for $ty {
+        impl<'a, T: ?Sized + Located> Located for $ty {
             #[inline(always)]
             fn loc(&self) -> Loc { <T as Located>::loc(self) }
         }
     };
     ($ty:ty) => {
-        impl<T: Located> Located for $ty {
+        impl<T: ?Sized + Located> Located for $ty {
             #[inline(always)]
             fn loc(&self) -> Loc { <T as Located>::loc(self) }
         }

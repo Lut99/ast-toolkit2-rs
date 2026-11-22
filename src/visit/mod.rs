@@ -43,12 +43,12 @@ macro_rules! visit_ptr_impl {
     };
 
     ('a, $ty:ty) => {
-        impl<'a, T: Visit> Visit for $ty {
+        impl<'a, T: ?Sized + Visit> Visit for $ty {
             visit_ptr_impl!(__impl);
         }
     };
     ($ty:ty) => {
-        impl<T: Visit> Visit for $ty {
+        impl<T: ?Sized + Visit> Visit for $ty {
             visit_ptr_impl!(__impl);
         }
     };
@@ -61,12 +61,12 @@ macro_rules! visit_mut_ptr_impl {
     };
 
     ('a, $ty:ty) => {
-        impl<'a, T: VisitMut> VisitMut for $ty {
+        impl<'a, T: ?Sized + VisitMut> VisitMut for $ty {
             visit_mut_ptr_impl!(__impl);
         }
     };
     ($ty:ty) => {
-        impl<T: VisitMut> VisitMut for $ty {
+        impl<T: ?Sized + VisitMut> VisitMut for $ty {
             visit_mut_ptr_impl!(__impl);
         }
     };

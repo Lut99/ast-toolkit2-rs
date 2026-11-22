@@ -39,12 +39,12 @@ macro_rules! node_ptr_impl {
     };
 
     ('a, $ty:ty) => {
-        impl<'a, T: Node> Node for $ty {
+        impl<'a, T: ?Sized + Node> Node for $ty {
             node_ptr_impl!(__impl);
         }
     };
     ($ty:ty) => {
-        impl<T: Node> Node for $ty {
+        impl<T: ?Sized + Node> Node for $ty {
             node_ptr_impl!(__impl);
         }
     };
@@ -58,12 +58,12 @@ macro_rules! node_mut_ptr_impl {
     };
 
     ('a, $ty:ty) => {
-        impl<'a, T: NodeMut> NodeMut for $ty {
+        impl<'a, T: ?Sized + NodeMut> NodeMut for $ty {
             node_mut_ptr_impl!(__impl);
         }
     };
     ($ty:ty) => {
-        impl<T: NodeMut> NodeMut for $ty {
+        impl<T: ?Sized + NodeMut> NodeMut for $ty {
             node_mut_ptr_impl!(__impl);
         }
     };
