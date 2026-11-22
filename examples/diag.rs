@@ -5,7 +5,8 @@
 //!   Showcase of pretty rendered diagnostics.
 //
 
-use ast_toolkit2::diag::layout4::renderers::HexRenderer;
+use ast_toolkit2::diag::layout4::Renderer;
+use ast_toolkit2::diag::layout4::renderers::{HexRenderer, Utf8Renderer};
 use ast_toolkit2::diag::{Annotation, Diag, Theme};
 use ast_toolkit2::loc::Loc;
 use ast_toolkit2::sources::Sources;
@@ -29,8 +30,9 @@ fn main() {
     let args = Args::parse();
 
     let mut sources = Sources::new();
-    let id = sources.add_bytes("tragedy.txt", b"Did you ever hear the tragedy of Darth Plagueis The Wise? I thought not. It's not a story the Jedi would tell you. It's a Sith legend. Darth Plagueis was a Dark Lord of the Sith, so powerful and so wise he could use the Force to influence the midichlorians to create life... He had such a knowledge of the dark side that he could even keep the ones he cared about from dying. The dark side of the Force is a pathway to many abilities some consider to be unnatural. He became so powerful... the only thing he was afraid of was losing his power, which eventually, of course, he did. Unfortunately, he taught his apprentice everything he knew, then his apprentice killed him in his sleep. Ironic. He could save others from death, but not himself.");
-    let renderer = if args.binary { HexRenderer::new(100, &sources) } else { todo!() };
+    let id = sources.add_bytes("tragedy.txt", b"Did you ever hear the tragedy of Darth Plagueis The Wise?\nI thought not.\nIt's not a story the Jedi would tell you.\nIt's a Sith legend.\nDarth Plagueis was a Dark Lord of the Sith,\nso powerful and so wise he could use the Force\nto influence the midichlorians to create life...\nHe had such a knowledge of the dark side\nthat he could even keep the ones he cared about from dying.\nThe dark side of the Force is a pathway to many abilities\nsome consider to be unnatural.\nHe became so powerful...\nthe only thing he was afraid of was losing his power,\nwhich eventually, of course, he did.\nUnfortunately, he taught his apprentice everything he knew,\nthen his apprentice killed him in his sleep.\nIronic.\nHe could save others from death,\nbut not himself.");
+    let renderer: Box<dyn Renderer<u8>> =
+        if args.binary { Box::new(HexRenderer::new(100, &sources)) } else { Box::new(Utf8Renderer::new(100, &sources)) };
 
     // Sourceless error
     let diag = Diag::error("You've attempted to listen to the tragedy of Darth Plagueis The Wise as a Jedi").with_theme(Theme::RUST);

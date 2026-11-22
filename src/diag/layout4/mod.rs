@@ -46,12 +46,12 @@ macro_rules! renderer_ptr_impl {
     };
 
     ('a, $ty:ty) => {
-        impl<'a, E, T: Renderer<E>> Renderer<E> for $ty {
+        impl<'a, E, T: ?Sized + Renderer<E>> Renderer<E> for $ty {
             renderer_ptr_impl!(__impl);
         }
     };
     ($ty:ty) => {
-        impl<E, T: Renderer<E>> Renderer<E> for $ty {
+        impl<E, T: ?Sized + Renderer<E>> Renderer<E> for $ty {
             renderer_ptr_impl!(__impl);
         }
     };

@@ -18,6 +18,14 @@ use crate::loc::Range;
 use crate::sources::Sources;
 
 
+/***** CONSTANTS *****/
+/// The char to write in the ascii part if it's not UTF-8 or a control character.
+pub const REPLACEMENT_CHAR: char = '•';
+
+
+
+
+
 /***** HELPERS *****/
 /// A wrapper around three slices pretending they are one.
 #[derive(Clone, Copy)]
@@ -205,7 +213,10 @@ impl<'s, 'r, R: BuildHasher> HexRenderer<'s, 'r, R> {
         write!(f, "    ")?;
         for i in 0..16 {
             if let Some(b) = line.get(i) {
-                let c = char::from_u32(*b as u32).unwrap_or('.');
+                let mut c = char::from_u32(*b as u32).unwrap_or(REPLACEMENT_CHAR);
+                if c.is_control() {
+                    c = REPLACEMENT_CHAR;
+                }
                 if let Some((sev, _)) = ranges.iter().find(|(_, (pos, len))| i >= *pos && i < pos + len) {
                     f.write_highlighted(*sev, c)?;
                 } else {
@@ -261,7 +272,10 @@ impl<'s, 'r, R: BuildHasher> HexRenderer<'s, 'r, R> {
                 // Write the ascii part
                 write!(&mut line, "    ")?;
                 for (highlighted, b) in buf {
-                    let c = char::from_u32(b as u32).unwrap_or('.');
+                    let mut c = char::from_u32(b as u32).unwrap_or(REPLACEMENT_CHAR);
+                    if c.is_control() {
+                        c = REPLACEMENT_CHAR;
+                    }
                     if highlighted {
                         line.write_highlighted(Severity::Suggestion, c)?;
                     } else {
@@ -304,7 +318,10 @@ impl<'s, 'r, R: BuildHasher> HexRenderer<'s, 'r, R> {
         // Write the ascii part
         write!(&mut line, "    ")?;
         for (highlighted, b) in &buf[..i % 16] {
-            let c = char::from_u32(*b as u32).unwrap_or('.');
+            let mut c = char::from_u32(*b as u32).unwrap_or(REPLACEMENT_CHAR);
+            if c.is_control() {
+                c = REPLACEMENT_CHAR;
+            }
             if *highlighted {
                 line.write_highlighted(Severity::Suggestion, c)?;
             } else {
@@ -332,7 +349,11 @@ impl<'s, 'r, R: BuildHasher> Renderer<u8> for HexRenderer<'s, 'r, R> {
 
         // Dive into the snippets
         let mut extra_notes = Vec::new();
-        for snip in msg.snippets {
+        for mut snip in msg.snippets {
+            // Filter out annotations that would be out-of-range
+            let source_len: u64 = self.sources.source_len(snip.source_id);
+            snip.annots = snip.annots.into_iter().filter(|a| a.range.pos < source_len).collect();
+
             // Skip the snippet if there are no annotations
             let name: &str = self.sources.get_name_of(snip.source_id).unwrap();
             if snip.annots.is_empty() {

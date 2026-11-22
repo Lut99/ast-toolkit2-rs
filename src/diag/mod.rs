@@ -57,11 +57,102 @@ pub trait Diagnostic<E> {
 #[cfg(test)]
 mod tests {
     #[cfg(feature = "sources")]
-    use layout4::renderers::HexRenderer;
+    use layout4::renderers::{HexRenderer, Utf8Renderer};
 
     use super::*;
     #[cfg(feature = "sources")]
     use crate::{loc::Loc, sources::Sources};
+
+    #[cfg(feature = "sources")]
+    #[test]
+    fn test_diag_display_utf8() {
+        let mut sources = Sources::new();
+        let id1 = sources.add_bytes("example1", b"Hello, world!");
+        let id2 = sources.add_bytes("example2", "Hello, world!\nHallo, wereld!\nGuten tag, werld!\nHej världen!\nBonjour le monde!\n".as_bytes());
+
+        let diag = Diag::<u8>::error("Oh no, something went wrong!")
+            .with_code("E000")
+            .with_annot(Annotation::error(Loc::encapsulate_range(id1, ..13)))
+            .with_annot(Annotation::suggestion(Loc::encapsulate_range(id1, ..5)).with_replace(b"Goodbye"))
+            .with_note("Remember this");
+        let sdiag = diag.display(Utf8Renderer::new(100, &sources)).to_string();
+        println!("{sdiag}");
+        assert_eq!(
+            sdiag,
+            r#"error[E000]: Oh no, something went wrong!
+ --> example1:1:1
+  |
+1 | Hello, world!
+  | -------------
+  |
+  = note: Remember this
+suggestion: Consider this instead
+ --> example1:1:1
+  |
+1 - Hello, world!
+1 + Goodbye, world!
+  |
+"#
+        );
+
+        let diag = Diag::<u8>::error("Two seperate lines are the problem")
+            .with_annot(Annotation::error(Loc::encapsulate_range(id2, ..13)))
+            .with_annot(Annotation::error(Loc::encapsulate_range(id2, 29..46)));
+        let sdiag = diag.display(Utf8Renderer::new(100, &sources)).to_string();
+        println!("{sdiag}");
+        assert_eq!(
+            sdiag,
+            r#"error: Two seperate lines are the problem
+ --> example2:1:1
+  |
+1 | Hello, world!
+  | -------------
+2 | Hallo, wereld!
+3 | Guten tag, werld!
+  | -----------------
+  |
+"#
+        );
+
+        let diag = Diag::<u8>::error("Two, more seperate lines are the problem")
+            .with_annot(Annotation::error(Loc::encapsulate_range(id2, ..13)))
+            .with_annot(Annotation::error(Loc::encapsulate_range(id2, 47..59)));
+        let sdiag = diag.display(Utf8Renderer::new(100, &sources)).to_string();
+        println!("{sdiag}");
+        assert_eq!(
+            sdiag,
+            r#"error: Two, more seperate lines are the problem
+ --> example2:1:1
+  |
+1 | Hello, world!
+  | -------------
+2 | Hallo, wereld!
+3 | Guten tag, werld!
+4 | Hej världen!
+  | ------------
+  |
+"#
+        );
+
+        let diag = Diag::<u8>::error("Two, way more seperate lines are the problem")
+            .with_annot(Annotation::error(Loc::encapsulate_range(id2, ..13)))
+            .with_annot(Annotation::error(Loc::encapsulate_range(id2, 60..77)));
+        let sdiag = diag.display(Utf8Renderer::new(100, &sources)).to_string();
+        println!("{sdiag}");
+        assert_eq!(
+            sdiag,
+            r#"error: Two, way more seperate lines are the problem
+ --> example2:1:1
+  |
+1 | Hello, world!
+  | -------------
+...
+5 | Bonjour le monde!
+  | -----------------
+  |
+"#
+        );
+    }
 
     #[cfg(feature = "sources")]
     #[test]

@@ -209,7 +209,7 @@ pub fn place_annots<'d>(
             line.try_insert_draw_at(annot.range.0, Draw::Marker(*marker, marker_style, annot.range.1.max(1)));
             line
         });
-        markers.push(rendered.len());
+        markers.push(rendered.len() - 1);
     }
 
     // `rendered` now has lines with markers, `markers` maps each annotation to
