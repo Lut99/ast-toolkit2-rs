@@ -16,6 +16,8 @@ mod derive_located;
 mod derive_node;
 #[cfg(feature = "nibble")]
 mod derive_parsable;
+#[cfg(feature = "visit")]
+mod derive_visit;
 
 // Imports
 #[cfg(any(feature = "loc", feature = "tree"))]
@@ -68,6 +70,19 @@ pub fn derive_parsable(item: TokenStream) -> TokenStream {
 #[proc_macro_derive(Node, attributes(node))]
 pub fn derive_node(item: TokenStream) -> TokenStream {
     match derive_node::handle(item.into()) {
+        Ok(res) => res.into(),
+        Err(err) => err.into_compile_error().into(),
+    }
+}
+
+
+
+// ast_toolkit2::visit
+#[cfg(feature = "visit")]
+#[doc = include_str!("../docs/visit.md")]
+#[proc_macro_derive(Visit, attributes(visit))]
+pub fn derive_visit(item: TokenStream) -> TokenStream {
+    match derive_visit::handle(item.into()) {
         Ok(res) => res.into(),
         Err(err) => err.into_compile_error().into(),
     }

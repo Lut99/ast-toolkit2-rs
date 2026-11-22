@@ -7,9 +7,6 @@
 
 use std::fmt;
 
-#[cfg(feature = "decl-macros")]
-pub use ast_toolkit2_decl_macros::write_highlighted;
-
 use super::super::super::themes::Theme;
 use super::super::StyledWrite;
 pub use super::super::messages::MessageReplace as Message;

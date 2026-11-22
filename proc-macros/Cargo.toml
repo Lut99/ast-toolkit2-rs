@@ -27,3 +27,4 @@ diag = ["dep:proc-macro2", "dep:syn", "dep:quote", "syn/clone-impls", "syn/deriv
 loc = ["dep:proc-macro2", "dep:syn", "dep:quote", "syn/derive", "syn/printing"]
 nibble = ["dep:convert_case", "dep:proc-macro2", "dep:syn", "dep:quote", "syn/clone-impls", "syn/derive", "syn/printing"]
 tree = ["dep:convert_case", "dep:proc-macro2", "dep:syn", "dep:quote", "syn/clone-impls"]
+visit = ["dep:proc-macro2", "dep:syn"]
