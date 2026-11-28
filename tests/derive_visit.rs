@@ -7,7 +7,7 @@
 
 use ast_toolkit2::loc::{Loc, Located};
 use ast_toolkit2::tree::Node;
-use ast_toolkit2::visit::{ReplaceWith as _, Visit, VisitMut, Visitor, VisitorMut, visitor_impl, visitor_mut_impl};
+use ast_toolkit2::visit::{Group, ReplaceWith as _, Visit, VisitMut, Visitor, VisitorMut, group, visitor_impl, visitor_mut_impl};
 
 
 /***** AST *****/
@@ -43,6 +43,27 @@ struct LitInt32 {
     #[visit(skip)]
     value: u32,
     loc:   Loc,
+}
+
+
+
+
+
+/***** GROUPS *****/
+group! {
+    /// Identifies all nodes carrying a numeric value.
+    pub group LitNum<'a> {
+        Int32(&'a LitInt32),
+        Int64(&'a LitInt64),
+    }
+}
+impl<'a> LitNum<'a> {
+    fn value(&self) -> u64 {
+        match self {
+            Self::Int32(l) => l.value as u64,
+            Self::Int64(l) => l.value,
+        }
+    }
 }
 
 
@@ -85,6 +106,16 @@ visitor_impl!(ValueVisitor as u64 {
 
 
 
+struct GroupVisitor;
+impl GroupVisitor {
+    fn visit_lit_num(&mut self, node: LitNum<'_>) -> u64 { node.value() }
+}
+visitor_impl!(GroupVisitor as u64 {
+    {group} LitNum,
+});
+
+
+
 
 
 /***** TESTS *****/
@@ -96,6 +127,9 @@ fn test_derive_visit() {
 
     let ex2 = Lit::Int64(LitInt64 { value: 42, loc: Loc::new() });
     assert_eq!(ValueVisitor.visit(&ex2), 42);
+
+    let ex3 = Lit::Int32(LitInt32 { value: 42, loc: Loc::new() });
+    assert_eq!(GroupVisitor.visit(&ex3), 42);
 }
 
 

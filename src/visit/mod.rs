@@ -25,7 +25,7 @@ use std::rc::Rc;
 use std::sync::{Arc, MutexGuard, RwLockReadGuard, RwLockWriteGuard};
 
 #[cfg(feature = "decl-macros")]
-pub use ast_toolkit2_decl_macros::{visitor_impl, visitor_mut_impl};
+pub use ast_toolkit2_decl_macros::{group, group_mut, visitor_impl, visitor_mut_impl};
 #[cfg(feature = "proc-macros")]
 pub use ast_toolkit2_proc_macros::{Visit, VisitMut};
 pub use composable::{Composable, Initializable};
@@ -88,6 +88,48 @@ macro_rules! visit_mut_ptr_impl {
 
 
 /***** INTERFACES *****/
+/// Marks an enum as representing a group of nodes in your AST read-only.
+///
+/// This enum does not live in your AST itself, but instead, it can be used when e.g.
+/// [`Visit`]ing, to target a hardcoded set of nodes.
+pub trait Group<'a>: Sized {
+    /// Attempts to "upcast" the given dynamic pointer to a node to group-pointer.
+    ///
+    /// Sounds rather technical, but its use is to attempt to see if a node is part of this group.
+    /// If it is, then it is returned as an element of 'self'.
+    ///
+    /// # Arguments
+    /// - `node`: An generic `N`ode who might be any subtype. Use [`Node::as_t()`] to attempt to
+    ///   cast the node to a specific type.
+    ///
+    /// # Returns
+    /// A new instance of `Self` if `node` was part of it, or else [`None`].
+    fn as_group<N: Node>(node: &'a N) -> Option<Self>;
+}
+
+
+
+/// Marks an enum as representing a group of nodes in your AST mutably.
+///
+/// This enum does not live in your AST itself, but instead, it can be used when e.g.
+/// [`Visit`](crate::visit::Visit)ing, to target a hardcoded set of nodes.
+pub trait GroupMut<'a>: Sized {
+    /// Attempts to "upcast" the given dynamic pointer to a node to group-pointer.
+    ///
+    /// Sounds rather technical, but its use is to attempt to see if a node is part of this group.
+    /// If it is, then it is returned as an element of 'self'.
+    ///
+    /// # Arguments
+    /// - `node`: An generic `N`ode who might be any subtype. Use [`NodeMut::as_t_mut()`] to
+    ///   attempt to cast the node to a specific type.
+    ///
+    /// # Returns
+    /// A new instance of `Self` if `node` was part of it, or else [`None`].
+    fn as_group_mut<N: NodeMut>(node: &'a mut N) -> Option<Self>;
+}
+
+
+
 /// Means that this node can be traversed and all of its children found.
 ///
 /// Lovingly also called the "babysitter" trait.

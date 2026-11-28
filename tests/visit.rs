@@ -9,7 +9,7 @@ use std::any::Any;
 
 use ast_toolkit2::loc::{Loc, Located};
 use ast_toolkit2::tree::{Node, NodeMut};
-use ast_toolkit2::visit::{ReplaceWith as _, Visit, VisitMut, Visitor, VisitorMut};
+use ast_toolkit2::visit::{Group, ReplaceWith as _, Visit, VisitMut, Visitor, VisitorMut};
 
 
 /***** AST *****/
@@ -146,6 +146,37 @@ impl VisitMut for LitInt32 {
 
 
 
+/***** GROUPS *****/
+/// Identifies all nodes carrying a numeric value.
+enum LitNum<'a> {
+    Int32(&'a LitInt32),
+    Int64(&'a LitInt64),
+}
+impl<'a> LitNum<'a> {
+    fn value(&self) -> u64 {
+        match self {
+            Self::Int32(l) => l.value as u64,
+            Self::Int64(l) => l.value,
+        }
+    }
+}
+impl<'a> Group<'a> for LitNum<'a> {
+    #[inline]
+    fn as_group<N: Node>(node: &'a N) -> Option<Self> {
+        if let Some(node) = node.as_t::<LitInt32>() {
+            Some(Self::Int32(node))
+        } else if let Some(node) = node.as_t::<LitInt64>() {
+            Some(Self::Int64(node))
+        } else {
+            None
+        }
+    }
+}
+
+
+
+
+
 /***** VISITORS *****/
 struct StringifyVisitor;
 impl StringifyVisitor {
@@ -203,6 +234,21 @@ impl Visitor for ValueVisitor {
 
 
 
+struct GroupVisitor;
+impl GroupVisitor {
+    fn visit_lit_num(&mut self, node: LitNum<'_>) -> u64 { node.value() }
+}
+impl Visitor for GroupVisitor {
+    type Result = u64;
+
+    #[inline]
+    fn visit<N: Visit>(&mut self, node: &N) -> Self::Result {
+        if let Some(node) = LitNum::as_group(node) { self.visit_lit_num(node) } else { node.visit(self) }
+    }
+}
+
+
+
 
 
 /***** TESTS *****/
@@ -214,4 +260,7 @@ fn test_visit() {
 
     let ex2 = Lit::Int64(LitInt64 { value: 42, loc: Loc::new() });
     assert_eq!(ValueVisitor.visit(&ex2), 42);
+
+    let ex3 = Lit::Int32(LitInt32 { value: 42, loc: Loc::new() });
+    assert_eq!(GroupVisitor.visit(&ex3), 42);
 }
