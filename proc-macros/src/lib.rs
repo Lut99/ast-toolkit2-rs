@@ -82,7 +82,17 @@ pub fn derive_node(item: TokenStream) -> TokenStream {
 #[doc = include_str!("../docs/visit.md")]
 #[proc_macro_derive(Visit, attributes(visit))]
 pub fn derive_visit(item: TokenStream) -> TokenStream {
-    match derive_visit::handle(item.into()) {
+    match derive_visit::handle(false, item.into()) {
+        Ok(res) => res.into(),
+        Err(err) => err.into_compile_error().into(),
+    }
+}
+
+#[cfg(feature = "visit")]
+#[doc = include_str!("../docs/visit_mut.md")]
+#[proc_macro_derive(VisitMut, attributes(visit))]
+pub fn derive_visit_mut(item: TokenStream) -> TokenStream {
+    match derive_visit::handle(true, item.into()) {
         Ok(res) => res.into(),
         Err(err) => err.into_compile_error().into(),
     }

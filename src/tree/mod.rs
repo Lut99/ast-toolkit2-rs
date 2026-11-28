@@ -13,6 +13,9 @@
 //!     detailled work.
 //
 
+// Modules
+mod impls;
+
 // Imports & Exports
 use std::any::Any;
 use std::cell::{Ref, RefMut};
@@ -96,12 +99,6 @@ pub trait Node: Located {
     fn as_t<T: 'static>(&self) -> Option<&T> { self.as_any().downcast_ref::<T>() }
 }
 
-// Std impls
-impl<T: 'static + Located> Node for Vec<T> {
-    #[inline(always)]
-    fn as_any(&self) -> &dyn Any { self as &dyn Any }
-}
-
 // Pointer-like impls
 node_ptr_impl!('a, &'a T);
 node_ptr_impl!('a, &'a mut T);
@@ -137,12 +134,6 @@ pub trait NodeMut: Node {
     /// Self downcasted if we were a supertype of `T`, or else [`None`].
     #[inline]
     fn as_t_mut<T: 'static>(&mut self) -> Option<&mut T> { self.as_any_mut().downcast_mut::<T>() }
-}
-
-// Std impls
-impl<T: 'static + Located> NodeMut for Vec<T> {
-    #[inline(always)]
-    fn as_any_mut(&mut self) -> &mut dyn Any { self as &mut dyn Any }
 }
 
 // Pointer-like impls

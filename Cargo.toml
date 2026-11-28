@@ -17,7 +17,7 @@ required-features = ["diag", "sources"]
 [[test]]
 name = "derive_diagnostic"
 path = "./tests/derive_diagnostic.rs"
-required-features = ["diag", "loc", "proc-macros"]
+required-features = ["diag", "proc-macros"]
 
 [[test]]
 name = "derive_located"
@@ -27,16 +27,21 @@ required-features = ["loc", "proc-macros"]
 [[test]]
 name = "derive_struct_parsable"
 path = "./tests/derive_struct_parsable.rs"
-required-features = ["nibble", "loc", "proc-macros"]
+required-features = ["nibble", "proc-macros"]
 [[test]]
 name = "derive_enum_parsable"
 path = "./tests/derive_enum_parsable.rs"
-required-features = ["nibble", "loc", "proc-macros"]
+required-features = ["nibble", "proc-macros"]
 
 [[test]]
 name = "derive_tree"
 path = "./tests/derive_tree.rs"
-required-features = ["loc", "proc-macros", "tree"]
+required-features = ["proc-macros", "tree"]
+
+[[test]]
+name = "derive_visit"
+path = "./tests/derive_visit.rs"
+required-features = ["decl-macros", "proc-macros", "visit"]
 
 [[test]]
 name = "visit"
@@ -47,6 +52,7 @@ required-features = ["visit"]
 [dependencies]
 console = { version = "0.16.0", default-features = false, features = ["std"], optional = true }
 hashbrown = { version = "0.17.0", default-features = false, optional = true }
+paste = { version = "1.0.0", default-features = false, optional = true }
 polonius-the-crab = { version = "0.5.0", default-features = false, optional = true }
 regex = { version = "1.13.0", default-features = false, optional = true }
 serde = { version = "1.0.0", default-features = false, features = ["derive"], optional = true }
@@ -77,12 +83,12 @@ print = ["ast-toolkit2-decl-macros/print"]
 punct = ["ast-toolkit2-decl-macros/punct"]
 sources = ["loc", "dep:hashbrown", "dep:polonius-the-crab"]
 tree = ["loc", "ast-toolkit2-proc-macros/tree"]
-visit = ["loc", "tree", "ast-toolkit2-proc-macros/visit"]
+visit = ["loc", "tree", "ast-toolkit2-decl-macros/visit", "ast-toolkit2-proc-macros/visit"]
 
 # Third-party
 color = ["dep:console"]
 macros = ["decl-macros", "proc-macros"]
-decl-macros = ["dep:ast-toolkit2-decl-macros"]
+decl-macros = ["dep:ast-toolkit2-decl-macros", "dep:paste"]
 proc-macros = ["dep:ast-toolkit2-proc-macros"]
 regex-unicode = ["regex/unicode"]
 serde = ["dep:serde"]

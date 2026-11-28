@@ -6,7 +6,7 @@
 //
 
 use std::cell::{Ref, RefMut};
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::convert::Infallible;
 use std::hint::unreachable_unchecked;
 use std::rc::Rc;
@@ -129,8 +129,9 @@ impl<const LEN: usize, T: Located> Located for [T; LEN] {
     fn loc(&self) -> Loc { <[T] as Located>::loc(self.as_slice()) }
 }
 located_collection_impl!(Vec<T>);
+located_collection_impl!(VecDeque<T>);
 located_collection_impl!(HashSet<T>);
-impl<K, V: Located> Located for HashMap<K, V> {
+impl<K: Located, V: Located> Located for HashMap<K, V> {
     /// Iterates over the values in this type to create one [`Loc`] [`Loc::extend()`]ed
     /// over all of the elements.
     ///
@@ -138,8 +139,9 @@ impl<K, V: Located> Located for HashMap<K, V> {
     #[inline]
     fn loc(&self) -> Loc {
         let mut res: Option<Loc> = None;
-        for elem in self.values() {
-            let loc = <V as Located>::loc(elem);
+        for (key, elem) in self {
+            let mut loc = <K as Located>::loc(key);
+            loc.extend(<V as Located>::loc(elem));
             res.get_or_insert(loc).extend(loc);
         }
         res.unwrap_or_else(Loc::new)

@@ -11,3 +11,5 @@
 mod print;
 #[cfg(feature = "punct")]
 mod punct;
+#[cfg(feature = "visit")]
+mod visit;

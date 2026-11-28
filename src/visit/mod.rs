@@ -24,6 +24,10 @@ use std::cell::{Ref, RefMut};
 use std::rc::Rc;
 use std::sync::{Arc, MutexGuard, RwLockReadGuard, RwLockWriteGuard};
 
+#[cfg(feature = "decl-macros")]
+pub use ast_toolkit2_decl_macros::{visitor_impl, visitor_mut_impl};
+#[cfg(feature = "proc-macros")]
+pub use ast_toolkit2_proc_macros::{Visit, VisitMut};
 pub use composable::{Composable, Initializable};
 pub use replace_with::ReplaceWith;
 
@@ -32,6 +36,13 @@ use crate::tree::{Node, NodeMut};
 /// Shorthand for including all the traits of this crate.
 pub mod prelude {
     pub use super::{Composable, Initializable, ReplaceWith, Visit, VisitMut};
+}
+
+/// Private macro stuff, like re-exports of external crates.
+#[cfg(feature = "decl-macros")]
+#[doc(hidden)]
+pub mod __private {
+    pub use paste::paste;
 }
 
 
