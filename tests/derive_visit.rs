@@ -7,7 +7,7 @@
 
 use ast_toolkit2::loc::{Loc, Located};
 use ast_toolkit2::tree::Node;
-use ast_toolkit2::visit::{Group, ReplaceWith as _, Visit, VisitMut, Visitor, VisitorMut, group, visitor_impl, visitor_mut_impl};
+use ast_toolkit2::visit::{ReplaceWith as _, Visit, VisitMut, Visitor, VisitorMut, group, visitor_impl, visitor_mut_impl};
 
 
 /***** AST *****/
